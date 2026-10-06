@@ -15,7 +15,8 @@
   "credits": [
     "punchbrotv - bloom, motion blur, depth of field and fog patches (Xenia)",
     "Margen67 - 60 FPS, 1280x720 and MSAA patches (Xenia)",
-    "Guy - tick-rate patch (Xenia)",
+    "Guy, Ultra - tick-rate, website items and Collector's Edition patches (Xenia)",
+    "Pepper - ultrawide patches (Xenia)",
     "Title-update ports and the title-update fog fix were made for 360 LiveMods"
   ],
   "versions": [
@@ -135,6 +136,44 @@
       }
     },
     {
+      "id": "widescreen",
+      "name": "21:9 ultrawide",
+      "category": "Visual",
+      "description": "Renders the game in 21:9 for ultrawide screens. Set your TV or monitor to stretch the 16:9 picture to fill the screen. Pick one aspect ratio only.",
+      "default": false,
+      "status": "experimental",
+      "credit": "Pepper (title-update port by 360 LiveMods)",
+      "patches": {
+        "base": [
+          ["0x8209FDF4", "3FAAAAAB", "3FE38E39"],
+          ["0x8209FE7C", "3FE38E39", "4017B426"]
+        ],
+        "tu": [
+          ["0x8209FE2C", "3FAAAAAB", "3FE38E39"],
+          ["0x8209FEB4", "3FE38E39", "4017B426"]
+        ]
+      }
+    },
+    {
+      "id": "superwide",
+      "name": "32:9 super ultrawide",
+      "category": "Visual",
+      "description": "Renders the game in 32:9 for super-ultrawide screens set to stretch the picture. Pick one aspect ratio only.",
+      "default": false,
+      "status": "experimental",
+      "credit": "Pepper (title-update port by 360 LiveMods)",
+      "patches": {
+        "base": [
+          ["0x8209FDF4", "3FAAAAAB", "4017B426"],
+          ["0x8209FE7C", "3FE38E39", "40638E39"]
+        ],
+        "tu": [
+          ["0x8209FE2C", "3FAAAAAB", "4017B426"],
+          ["0x8209FEB4", "3FE38E39", "40638E39"]
+        ]
+      }
+    },
+    {
       "id": "fps60",
       "name": "60 FPS",
       "category": "Performance",
@@ -242,22 +281,65 @@
       }
     },
     {
+      "id": "website_items",
+      "name": "Unlock website items",
+      "category": "Gameplay",
+      "description": "Opens the Guild chest with the items that used to be unlocked through the Fable II website.",
+      "default": false,
+      "status": "experimental",
+      "credit": "Guy, Ultra",
+      "patches": {
+        "base": [
+          ["0x8256E4E3", "00", "01"],
+          ["0x8256E4B8", "419A0028", "42800028"]
+        ],
+        "tu": [
+          ["0x8253B1D3", "00", "01"],
+          ["0x8253B1A8", "419A0028", "42800028"]
+        ]
+      }
+    },
+    {
+      "id": "collectors",
+      "name": "Unlock Collector's Edition content",
+      "category": "Gameplay",
+      "description": "Adds Hal's items to the Guild chest and opens the Hall of the Dead dungeon.",
+      "default": false,
+      "status": "experimental",
+      "credit": "Guy, Ultra",
+      "patches": {
+        "base": [
+          ["0x824B366C", "81230010", "39200001"]
+        ],
+        "tu": [
+          ["0x824EDCF4", "81230010", "39200001"]
+        ]
+      }
+    },
+    {
       "id": "tickrate",
       "name": "30 Hz tick rate",
       "category": "Performance",
-      "description": "Doubles the game logic rate for smoother UI and lower input lag.",
+      "description": "Doubles the game's logic rate (and physics to 60 Hz) for a smoother UI and less input lag, with the community's fix for getting stuck on stairs and ledges.",
       "default": false,
       "status": "unstable",
-      "credit": "Guy",
-      "warning": "Crashed when loading into a save during testing. Only enable it if you want to experiment.",
+      "credit": "Guy, Ultra",
+      "warning": "An earlier version of this patch crashed when loading a save on a real console. This version also raises the physics rate and adds the stairs fix, but hasn't been tried on hardware yet.",
       "patches": {
         "base": [
           ["0x8233AEB4", "D8089510", "60000000"],
-          ["0x83319510", "402E0000", "403E0000"]
+          ["0x8233AE98", "D8099518", "60000000"],
+          ["0x83319511", "2E", "3E"],
+          ["0x83319519", "2E", "4E"],
+          ["0x82E41F54", "816B0000", "39600001"]
+        ],
+        "tu": [
+          ["0x8231091C", "D8089660", "60000000"],
+          ["0x82310900", "D8099668", "60000000"],
+          ["0x83319661", "2E", "3E"],
+          ["0x83319669", "2E", "4E"],
+          ["0x82E487E4", "816B0000", "39600001"]
         ]
-      },
-      "unavailable": {
-        "tu": "Not available for the title update."
       }
     }
   ]

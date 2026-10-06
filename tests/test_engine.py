@@ -180,3 +180,14 @@ def test_fps_monitor_reads_frame_counter():
         srv.close()
     assert samples and all(40 <= s <= 50 for s in samples), samples
     assert ended == ["The game has closed."]
+
+
+@pytest.mark.skipif(not (BASE and os.environ.get("LIVEMODS_TU_PRISTINE")), reason="game images not provided")
+def test_every_fable2_original_matches_the_game(fable2):
+    """Each patch's 'original' bytes must be what the unmodified game has at that address."""
+    images = {"base": Path(BASE).read_bytes(), "tu": Path(os.environ["LIVEMODS_TU_PRISTINE"]).read_bytes()}
+    for m in fable2.mods:
+        for vid, plist in m.patches.items():
+            for p in plist:
+                off = p.address - 0x82000000
+                assert images[vid][off:off + len(p.original)] == p.original, (m.id, vid, hex(p.address))

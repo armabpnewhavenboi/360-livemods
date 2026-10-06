@@ -241,10 +241,10 @@ class SideItem(ctk.CTkFrame):
 def _fit(text: str, font: ctk.CTkFont, width: int, widget) -> str:
     """Shorten text with an ellipsis so it fits `width` logical pixels."""
     try:
-        px = width * ctk.ScalingTracker.get_widget_scaling(widget)
-        if font.measure(text) <= px:
+        # CTkFont measures in unscaled (logical) pixels; scaling is applied when it's drawn
+        if font.measure(text) <= width:
             return text
-        while text and font.measure(text + "…") > px:
+        while text and font.measure(text + "…") > width:
             text = text[:-1]
         return text.rstrip(" -:,") + "…"
     except Exception:  # noqa: BLE001 - measuring is cosmetic
@@ -361,8 +361,9 @@ class App(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.after(80, self._drain_events)
         self.after(2500, self.check_updates)
+        self._startup_game = str(self.settings.data.get("last_game") or "")
         if self.games:
-            last = self.settings.data.get("last_game")
+            last = self._startup_game
             self.select_game(next((g for g in self.games if g.id == last), self.games[0]), user=False)
         for e in self.load_errors:
             self.log("warn", f"Could not load game definition {e}")
@@ -413,6 +414,7 @@ class App(ctk.CTk):
         self.lib_list = ctk.CTkScrollableFrame(side, fg_color="transparent", scrollbar_button_color=C["line"],
                                                scrollbar_button_hover_color=C["faint"], corner_radius=0)
         self.lib_list.grid(row=5, column=0, sticky="nsew", padx=(6, 4))
+        self.lib_list._parent_canvas.bind("<Configure>", lambda e: self.after(30, self._lib_scrollbar), add="+")
         self.lib_msg = ctk.CTkLabel(side, text="Loading the community library…", font=F.b(12), text_color=C["faint"],
                                     anchor="w", justify="left", wraplength=210)
         self.lib_msg.grid(row=6, column=0, sticky="ew", padx=22, pady=(4, 0))
@@ -603,7 +605,7 @@ class App(ctk.CTk):
             self.ver_auto.pack_forget()
             self.version_seg.pack(fill="x", padx=16, before=self.ver_msg)
             if not self.mod_buttons["Recommended"].winfo_ismapped():
-                self.mod_buttons["Recommended"].pack(side="right", padx=(4, 0), before=self.mod_buttons["Clear"])
+                self.mod_buttons["Recommended"].pack(side="right", padx=(4, 0), after=self.mod_buttons["Clear"])
             names = [v.name for v in game.versions]
             self.version_seg.configure(values=names)
             vid = gs.get("version", game.versions[0].id)
@@ -887,10 +889,10 @@ class App(ctk.CTk):
             elif low.startswith("identifying"):
                 self._set_status("Identifying" + msg[msg.rfind("…"):] if "…" in msg else msg, C["amber"], True,
                                  f"First time with this version of {self.game.name} only. Keep the game running.")
-            elif ("wrong" in low or "not running" in low or "couldn't" in low or "unknown" in low
-                  or "different game" in low):
+            # match fixed prefixes only: game names can contain any word ("XCOM: Enemy Unknown")
+            elif low.startswith(("wrong game version", "game not running", "couldn't reach the game")):
                 self._set_status(msg, C["err"], False, "See the activity log for details.")
-            elif "warning" in low:
+            elif low.startswith("finished with warnings"):
                 self._set_status(msg, C["warn"], False, "See the activity log for details.")
             elif low == "stopped":
                 self._set_status("Stopped", C["faint"], False, "Press Start, then launch the game on your console.")
@@ -912,6 +914,11 @@ class App(ctk.CTk):
                                  msg + " Press Start before launching it again.")
         elif kind == "done":
             self._lock(False)
+            if getattr(self, "_lib_reselect", False):
+                self._lib_reselect = False
+                if self.game is not None and self.game.library is not None and self.library \
+                        and self.game.title_id in self.library.by_id:
+                    self.select_library_title(self.game.title_id, user=False)
             if self.status.cget("text").startswith(("Waiting", "Connecting", "Stopping")):
                 self._set_status("Ready", C["faint"], False, "Press Start, then launch the game on your console.")
         else:
@@ -1032,11 +1039,13 @@ class App(ctk.CTk):
             self.lib_games.clear()
             self.lib_search.configure(placeholder_text=f"Search {len(data)} games or title ID" if data.titles
                                       else "Search games or title ID")
-            if self.game is not None and self.game.library is not None and not self.busy:
-                if self.game.title_id in data.by_id:
+            if self.game is not None and self.game.library is not None:
+                if self.busy:
+                    self._lib_reselect = True        # refresh the page once the run ends
+                elif self.game.title_id in data.by_id:
                     self.select_library_title(self.game.title_id, user=False)
-            elif not self._picked and str(self.settings.data.get("last_game", "")).startswith("lib-"):
-                self.select_library_title(self.settings.data["last_game"][4:], user=False)
+            elif not self._picked and self._startup_game.startswith("lib-"):
+                self.select_library_title(self._startup_game[4:], user=False)
             self._fill_lib_list()
             if data.titles:
                 self.lib_get.grid_remove()

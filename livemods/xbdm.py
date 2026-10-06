@@ -131,6 +131,22 @@ class XbdmClient:
                 continue
         return mods
 
+    def running_path(self) -> str | None:
+        """Path of the running title's executable (from `xbeinfo running`), or None if this XBDM
+        doesn't say. Used only as a hint, e.g. to recognise the dashboard."""
+        r = self.command("xbeinfo running")
+        text = r
+        if r.startswith("202"):
+            while True:
+                line = self._readline()
+                if line == ".":
+                    break
+                text += " " + line
+        elif not r.startswith("200"):
+            return None
+        m = re.search(r'name="([^"]*)"', text)
+        return m.group(1) if m else None
+
     def write(self, address: int, data: bytes) -> None:
         r = self.command(f"setmem addr=0x{address:08x} data={data.hex()}")
         if not r.startswith("200"):

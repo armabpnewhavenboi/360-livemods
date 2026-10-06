@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import re
 import shutil
 import struct
@@ -240,7 +241,15 @@ def load_library(folder: Path | None = None) -> Library:
         t = titles.setdefault(tid, LibTitle(tid, name))
         if len(name) < len(t.name) or not t.name:
             t.name = name                      # several files per game: keep the plainest name
-        t.builds.append(build)
+        same = next((b for b in t.builds if set(b.hashes) & set(build.hashes)), None)
+        if same:                               # two files for the same build (e.g. TU10 and TU18
+            same.patches += build.patches      # sharing an executable): one version, all patches
+            same.hashes += [h for h in build.hashes if h not in same.hashes]
+            if build.label not in same.label.split("; "):
+                same.label += f"; {build.label}"
+            same.file += f"; {build.file}"
+        else:
+            t.builds.append(build)
     for t in titles.values():
         t.builds.sort(key=lambda b: (b.label != "Standard", b.label.lower()))
         seen: dict[str, int] = {}
@@ -278,34 +287,66 @@ def download_library(progress=None, folder: Path | None = None, url: str = ZIP_U
                 raise OSError("The library download is unexpectedly large - stopped.")
             if progress:
                 progress(buf.tell(), total)
-    tmp = folder.with_name(folder.name + ".new")
-    shutil.rmtree(tmp, ignore_errors=True)
+    stamp = f"{os.getpid()}-{int(time.time() * 1000)}"
+    tmp = folder.with_name(f"{folder.name}.new-{stamp}")
     (tmp / "patches").mkdir(parents=True)
     count = 0
-    with zipfile.ZipFile(buf) as z:
-        for info in z.infolist():
-            parts = info.filename.split("/")
-            # <repo>-main/patches/<file>.patch.toml  - take only those, flattened (no path tricks)
-            if len(parts) == 3 and parts[1] == "patches" and parts[2].endswith(".patch.toml") \
-                    and "\\" not in parts[2] and not parts[2].startswith(".") and info.file_size < 2_000_000:
-                (tmp / "patches" / parts[2]).write_bytes(z.read(info))
-                count += 1
+    try:
+        with zipfile.ZipFile(buf) as z:
+            for info in z.infolist():
+                parts = info.filename.split("/")
+                # <repo>-main/patches/<file>.patch.toml - only those, flattened (no path tricks)
+                name = parts[-1]
+                if len(parts) == 3 and parts[1] == "patches" and name.endswith(".patch.toml") \
+                        and not re.search(r'[\\:*?"<>|]', name) and not name.startswith(".") \
+                        and info.file_size < 2_000_000:
+                    (tmp / "patches" / name).write_bytes(z.read(info))
+                    count += 1
+    except (zipfile.BadZipFile, OSError):
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise OSError("the download was damaged") from None
     if count == 0:
         shutil.rmtree(tmp, ignore_errors=True)
-        raise OSError("The download didn't contain any patch files.")
+        raise OSError("the download didn't contain any patch files")
     (tmp / "meta.json").write_text(json.dumps({"fetched_at": time.time(), "files": count,
                                                "source": PAGE_URL}), encoding="utf-8")
     lib = load_library(tmp)
     if not lib.titles:
         shutil.rmtree(tmp, ignore_errors=True)
-        raise OSError("None of the downloaded patch files could be read.")
-    old = folder.with_name(folder.name + ".old")
-    shutil.rmtree(old, ignore_errors=True)
-    if folder.exists():
-        folder.rename(old)
-    tmp.rename(folder)
-    shutil.rmtree(old, ignore_errors=True)
+        raise OSError("none of the downloaded patch files could be read")
+    _swap_in(tmp, folder)
     return load_library(folder)
+
+
+def _retry(fn, tries: int = 6):
+    for i in range(tries):
+        try:
+            return fn()
+        except OSError:
+            if i == tries - 1:
+                raise
+            time.sleep(0.25 * (i + 1))     # antivirus/indexer briefly holding a fresh file (Windows)
+
+
+def _swap_in(new: Path, folder: Path) -> None:
+    """Replace `folder` with `new`, putting the old copy back if anything goes wrong."""
+    old = folder.with_name(f"{folder.name}.old-{os.getpid()}-{int(time.time() * 1000)}")
+    had_old = folder.exists()
+    try:
+        if had_old:
+            _retry(lambda: folder.rename(old))
+        _retry(lambda: new.rename(folder))
+    except OSError:
+        if had_old and old.exists() and not folder.exists():
+            try:
+                old.rename(folder)
+            except OSError:
+                pass
+        shutil.rmtree(new, ignore_errors=True)
+        raise
+    shutil.rmtree(old, ignore_errors=True)
+    for stale in folder.parent.glob(f"{folder.name}.*-*"):    # leftovers from interrupted updates
+        shutil.rmtree(stale, ignore_errors=True)
 
 
 # ------------------------------------------------------------------------ app model

@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.3.0
+- **Community library: 300+ games.** The app downloads the Xenia community patch library
+  (github.com/xenia-canary/game-patches) and offers its patches for real consoles. Search by name
+  or title ID in the sidebar.
+- **Exact version matching.** The first time you play a version of a library game, the app reads its
+  code over XBDM and computes the same build hash Xenia uses (about a minute, once). Patches are only
+  ever applied to the exact build they were made for; after that, the game is recognised the moment
+  it loads and patched before it runs. Title updates loading on top of the base game are handled.
+- Every patch site is checked before writing, patches pointing outside the game's memory are
+  skipped, and patches that only work around emulator problems are flagged and need confirming.
+- Fable II: Unlock website items, Unlock Collector's Edition content, 21:9 and 32:9 ultrawide
+  (experimental, base game and title update); the 30 Hz tick rate is updated with the community's
+  physics and stairs fixes and now also covers the title update (still marked unstable).
+- Long window text now wraps at small window sizes instead of being cut off.
+- Command line: `--update-library`, `--library [search]`, and library games by title ID.
+
 ## 1.2.0
 - Live frame-rate readout: while the game runs with mods active, the status panel shows the
   current FPS plus the session average and low (reads the game's own once-per-frame counter).

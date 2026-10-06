@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import struct
 import time
 from dataclasses import dataclass
@@ -26,7 +27,10 @@ from .xbdm import Module, XbdmClient, XbdmError
 
 XENIA_THUNK = bytes.fromhex("440000424E8000206000000060000000")   # sc 2; blr; nop; nop
 _THUNK_TAIL = bytes.fromhex("7D6903A64E800420")                      # mtctr r11; bctr
-PAGE_SIZES = (0x10000, 0x1000)
+# Xenia hashes whole 64 KB pages (the page size of the title heap). For the rare executables built
+# with 4 KB pages Xenia's page arithmetic doesn't line up with the image, so those builds can't be
+# matched; nothing is ever written to a build that doesn't match.
+PAGE_SIZES = (0x10000,)
 SECTION_EXEC = 0x20 | 0x20000000                                     # code / executable
 READ_CHUNK = 0x10000
 
@@ -131,6 +135,15 @@ class Scan:
     image_start: int
     thunks: list[int]                   # thunk addresses
 
+    def thunks_for_loader_check(self, n: int = 3) -> list[int]:
+        """A few thunks to watch for the loader finishing, preferring ones seen resolved."""
+        res = [t for t in self.thunks if thunk_state(self.original(t, 16)) == "resolved"]
+        pick = res or self.thunks
+        if len(pick) <= n:
+            return pick
+        step = len(pick) / n
+        return [pick[int(i * step)] for i in range(n)]
+
     def original(self, address: int, length: int) -> bytes | None:
         o = address - self.image_start
         if o < 0 or o + length > len(self.image):
@@ -224,25 +237,30 @@ class BuildCache:
     def get(self, fp: str) -> dict | None:
         return self.data["builds"].get(fp)
 
-    def put(self, fp: str, record: dict) -> None:
+    def put(self, fp: str, record: dict) -> bool:
         record["seen"] = time.time()
         self.data["builds"][fp] = record
-        self.save()
+        return self.save()
 
-    def save(self) -> None:
-        try:
-            tmp = self.path.with_suffix(".tmp")
-            tmp.write_text(json.dumps(self.data, indent=1), encoding="utf-8")
-            tmp.replace(self.path)
-        except OSError:
-            pass
+    def save(self) -> bool:
+        """Write the cache. Retries briefly (another program, e.g. antivirus, may hold the file)."""
+        text = json.dumps(self.data, indent=1)
+        for attempt in range(5):
+            try:
+                tmp = self.path.with_name(f"{self.path.stem}.{os.getpid()}.tmp")
+                tmp.write_text(text, encoding="utf-8")
+                tmp.replace(self.path)
+                return True
+            except OSError:
+                time.sleep(0.2 * (attempt + 1))
+        return False
 
 
 def record_from_scan(scan: Scan, module: Module) -> dict:
     return {
         "hashes": {str(p): f"{h:016X}" for p, h in scan.hashes.items()},
         "code": [min(s for s, _ in scan.code.values()), max(e for _, e in scan.code.values())],
-        "thunk": scan.thunks[0] if scan.thunks else None,
+        "thunks": scan.thunks_for_loader_check(),
         "module": [module.name, module.base, module.size],
         "originals": {},
         "restore": {},

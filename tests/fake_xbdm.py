@@ -75,6 +75,13 @@ class FakeXbdm:
                 if line == "modules":
                     c.sendall(self._modules())
                     continue
+                if line == "xbeinfo running":
+                    mem = self._memory()
+                    st = self.timeline[self._stage] if self._stage >= 0 else ()
+                    path = st[3] if len(st) > 3 else f"\\Device\\Harddisk0\\Partition1\\Games\\{self._name}"
+                    c.sendall(("202- multiline response follows\r\ntimestamp=0x00000000 checksum=0x00000000\r\n"
+                               f'name="{path}"\r\n.\r\n').encode() if mem is not None else b"402- no title\r\n")
+                    continue
                 args = dict(p.split("=", 1) for p in line.split()[1:] if "=" in p)
                 addr = int(args["addr"], 16)
                 off = addr - self.base

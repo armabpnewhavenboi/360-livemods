@@ -332,7 +332,7 @@ def test_unknown_build_is_reported(lib, tmp_path):
     tl = [(0, DASH, "Aurora.xex")] + boot(make_image(99), 0.3)
     r, ev, srv = run_engine(tl, lib, "4D530001", {"60 FPS"}, cache, stop_after=4, getmemex=False)
     assert srv.writes == []
-    assert any("isn't any version of Test Game" in m for k, m in ev if isinstance(m, str))
+    assert any("isn't a version of Test Game" in m for k, m in ev if isinstance(m, str))
 
 
 def test_changed_code_is_not_patched_and_restore_works(lib, tmp_path):
@@ -360,3 +360,106 @@ def _patched(img: bytearray) -> bytearray:
     out[0x30010:0x30014] = struct.pack(">f", 1.5)
     out[0x30020] = 0xFF
     return out
+
+
+# ------------------------------------------------- scenarios from the independent review
+def _msgs(ev):
+    return " | ".join(m for k, m in ev if isinstance(m, str))
+
+
+def test_game_running_at_start_is_identified_after_relaunch(lib, tmp_path):
+    """Start pressed while the (never-identified) game runs; the user quits and relaunches as told."""
+    cache = BuildCache(tmp_path / "b.json")
+    tl = [(0, resolved(GAME_A)), (1.0, DASH, "Aurora.xex")] + boot(GAME_A, 1.5)
+    r, ev, srv = run_engine(tl, lib, "4D530001", {"60 FPS"}, cache, stop_after=6)
+    assert "Identified" in _msgs(ev), _msgs(ev)
+
+
+def test_relaunch_without_a_dashboard_module_in_between(lib, tmp_path):
+    """No title module between runs (stock dashboard): identified, quit, relaunched, patched."""
+    cache = BuildCache(tmp_path / "b.json")
+    tl = [(0, None)] + boot(GAME_A, 0.3) + [(4.0, None)] + boot(GAME_A, 4.5)
+    r, ev, srv = run_engine(tl, lib, "4D530001", {"60 FPS"}, cache, stop_after=9)
+    assert srv.writes == [(0x82012340, bytes.fromhex("39600001"))], _msgs(ev)
+
+
+def test_dashboard_is_never_scanned(lib, tmp_path):
+    cache = BuildCache(tmp_path / "b.json")
+    aurora = r"\Device\Harddisk0\Partition1\Apps\Aurora\Aurora.xex"
+    tl = [(0, None), (0.2, DASH, "default.xex", aurora)] + boot(GAME_A, 0.5) + \
+         [(4.0, DASH, "default.xex", aurora)] + boot(GAME_A, 8.0)
+    r, ev, srv = run_engine(tl, lib, "4D530001", {"60 FPS"}, cache, stop_after=12)
+    assert _msgs(ev).count("MB of code") == 1, _msgs(ev)
+    assert r.applied == 1
+
+
+def test_god_path_names_another_game(lib, tmp_path):
+    cache = BuildCache(tmp_path / "b.json")
+    god = r"\Device\Harddisk0\Partition1\Content\0000000000000000\4D530002\00007000\ABCDEF"
+    tl = [(0, DASH, "Aurora.xex"), (0.3, resolved(OTHER), "default.xex", god)]
+    r, ev, srv = run_engine(tl, lib, "4D530001", {"60 FPS"}, cache, stop_after=4)
+    assert "That's Other Game, not Test Game" in _msgs(ev) and "MB of code" not in _msgs(ev)
+
+
+def test_new_code_patch_after_identification_is_not_written_blind(lib, tmp_path):
+    """Build identified with a library lacking a code patch; the library gains it later."""
+    cache = BuildCache(tmp_path / "b.json")
+    files = lib_files()
+    head, rest = files["4D530001 - Test Game.patch.toml"].split("[[patch]]", 1)
+    files1 = dict(files)
+    files1["4D530001 - Test Game.patch.toml"] = head + "[[patch]]" + rest.split("[[patch]]")[1]
+    lib1 = load_library(write_patches(tmp_path / "lib1", files1))
+    run_engine([(0, DASH, "Aurora.xex")] + boot(GAME_A, 0.3), lib1, "4D530001", {"Brighter"}, cache, stop_after=3)
+    odd = bytearray(GAME_A)
+    odd[0x12340:0x12344] = b"\x60\x00\x00\x00"
+    r, ev, srv = run_engine([(0, DASH, "Aurora.xex")] + boot(odd, 0.3), lib, "4D530001", {"60 FPS"}, cache,
+                            stop_after=4)
+    assert all(a != 0x82012340 for a, _ in srv.writes), _msgs(ev)
+
+
+def test_patch_now_waits_for_the_loader(lib, tmp_path):
+    cache = BuildCache(tmp_path / "b.json")
+    run_engine([(0, DASH, "Aurora.xex")] + boot(GAME_A, 0.3), lib, "4D530001", {"60 FPS"}, cache, stop_after=3)
+    r, ev, srv = run_engine([(0, GAME_A)], lib, "4D530001", {"60 FPS"}, cache, wait=False)   # raw thunks
+    assert not srv.writes and "still loading" in _msgs(ev)
+
+
+def test_losing_the_console_while_watching_is_reported(lib, tmp_path, monkeypatch):
+    monkeypatch.setattr(eng_mod, "WATCH_SECONDS", 5)
+    cache = BuildCache(tmp_path / "b.json")
+    run_engine([(0, DASH, "Aurora.xex")] + boot(GAME_A, 0.3), lib, "4D530001", {"60 FPS"}, cache, stop_after=3)
+    srv = FakeXbdm([(0, DASH, "Aurora.xex")] + boot(GAME_A, 0.3), port=0)
+    ev = []
+    e = LibraryEngine(lambda k, m: ev.append((k, m)), lib, cache)
+    game = to_game(lib.by_id["4D530001"])
+    mods = [m for m in game.mods if m.name == "60 FPS"]
+    xb.XbdmClient.__init__.__defaults__ = (srv.port, 1.0)
+    orig_read = xb.XbdmClient.read
+
+    def read(self, a, n):
+        if any("Watching" in str(m) for _, m in ev):
+            raise OSError("console froze")
+        return orig_read(self, a, n)
+    monkeypatch.setattr(xb.XbdmClient, "read", read)
+    threading.Timer(4, e.stop).start()
+    try:
+        r = e.run("127.0.0.1", game, "*", mods)
+    finally:
+        xb.XbdmClient.__init__.__defaults__ = (730, 5.0)
+        srv.close()
+    assert "(connection lost)" in r.failed and "All done" not in _msgs(ev)
+
+
+def test_same_build_in_two_files_is_one_version(tmp_path):
+    h = xenia_hash(GAME_A)
+    body = '[[patch]]\n    name = "{n}"\n    [[patch.be8]]\n        address = 0x82030020\n        value = 1\n'
+    lib = load_library(write_patches(tmp_path, {
+        "4D530003 - Twin (TU10).patch.toml": f'title_name = "Twin"\ntitle_id = "4D530003"\nhash = "{h}"\n'
+                                             + body.format(n="A"),
+        "4D530003 - Twin (TU18).patch.toml": f'title_name = "Twin"\ntitle_id = "4D530003"\nhash = "{h}"\n'
+                                             + body.format(n="A") + body.format(n="B"),
+    }))
+    t = lib.by_id["4D530003"]
+    assert len(t.builds) == 1 and t.builds[0].label == "TU10; TU18"
+    g = to_game(t)
+    assert [m.name for m in g.mods] == ["A", "A (2)", "B"] and len(g.versions) == 1
