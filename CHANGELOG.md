@@ -1,6 +1,15 @@
 # Changelog
 
+## 1.5.0
+- Removed the community library. Xenia's emulator patches crashed real consoles across the board
+  (about 20 games tried), so 360 LiveMods goes back to hand-made, hardware-tested definitions only.
+  The library's downloaded files in `%APPDATA%\360LiveMods\library` are no longer used and can be deleted.
+- Kept from 1.4.0: the Fable II extras (ultrawide, website items, Collector's Edition content,
+  updated tick rate - all still experimental/unstable), window text that wraps at small sizes, and
+  long game names that fit the header.
+
 ## 1.4.0
+- Community library (removed again in 1.5.0).
 - **Community library: 300+ games.** The app downloads the Xenia community patch library
   (github.com/xenia-canary/game-patches) and offers its patches for real consoles. Search by name
   or title ID in the sidebar.

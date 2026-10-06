@@ -69,13 +69,10 @@ aware that a title update usually moves the code, so it needs its own `versions`
 addresses. Find them by matching the surrounding instructions in a memory dump of the updated game,
 and test on real hardware: some emulator patches don't survive the trip (see Fable II's 720p).
 
-### Community library vs. hand-made definitions
+### Test against the real game
 
-Games in the community library already work in the app without a definition here. A hand-made
-definition is worth writing when you've tested patches on hardware, fixed or ported them (for
-example to a title update the library doesn't cover), or want version detection that patches from
-the very first boot. Test your definition against an unmodified game image: every `original` must be
-exactly what the game has at that address.
+Check your definition against an unmodified game image: every `original` must be exactly what the
+game has at that address.
 
 ### Checklist before opening a pull request
 

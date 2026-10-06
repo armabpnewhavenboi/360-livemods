@@ -17,9 +17,6 @@ from .engine import Engine, FpsMonitor
 from .games import Game, Mod, load_all, user_dir
 from . import updater
 from .banner import HEADER_H, render_banner
-from .identify import BuildCache
-from .libengine import LibraryEngine
-from .library import AUTO, PAGE_URL as LIBRARY_URL, Library, download_library, load_library, needs_refresh, to_game
 from .xbdm import test_connection
 
 REPO_URL = "https://github.com/armabpnewhavenboi/360-livemods"
@@ -44,9 +41,7 @@ STATUS_TAG = {  # mod.status -> (label, colour)
     "tested": ("Tested", C["ok"]),
     "experimental": ("Experimental", C["warn"]),
     "unstable": ("Unstable", C["err"]),
-    "community": ("Community", "#86A8E7"),
 }
-LIB_SHOWN = 80          # library entries listed at once; searching narrows the rest
 
 
 def _asset(*parts: str) -> Path:
@@ -150,14 +145,6 @@ class ModRow(ctk.CTkFrame):
                                  anchor="w", justify="left", wraplength=560)
         self.desc.grid(row=1, column=1, sticky="ew", pady=(1, 0))
         credit = f"Patch by {mod.credit}" if mod.credit else ""
-        game = app.game
-        if game is not None and game.library is not None and len(game.versions) > 1:
-            has = [v.name for v in game.versions if v.id in mod.patches]
-            if len(has) < len(game.versions):
-                credit += (" · " if credit else "") + "Only for " + "; ".join(has)
-        self.credit = ctk.CTkLabel(self, text=credit, font=F.b(11), text_color=C["faint"], anchor="w")
-        if credit:
-            self.credit.grid(row=2, column=1, sticky="ew")
 
     def _click(self):
         if self.box.cget("state") != "disabled":
@@ -183,8 +170,6 @@ class ModRow(ctk.CTkFrame):
     def set_version(self, version_id: str):
         if self.mod.available_for(version_id):
             label, color = STATUS_TAG.get(self.mod.status, ("", C["muted"]))
-            if self.mod.category == "Emulator fixes":
-                label = "Emulator fix"
             self.tag.configure(text=label, text_color=color)
             self.box.configure(state="normal")
             self.name.configure(text_color=C["text"])
@@ -306,9 +291,6 @@ class AboutDialog(ctk.CTkToplevel):
         for g in app.games:
             lines.append(f"\n{g.name}")
             lines += [f"  • {c}" for c in g.credits]
-        lines += ["", "Community library",
-                  f"  • Patches by the Xenia community ({LIBRARY_URL}); each patch shows its author. "
-                  "The library is downloaded straight from GitHub to this PC."]
         lines += ["", "Fonts: Chakra Petch and IBM Plex (SIL Open Font License).",
                   "Game artwork belongs to its respective owners and is shown only to identify the game.", "",
                   f"Extra game definitions can be added to:\n{user_dir()}", "",
@@ -341,13 +323,6 @@ class App(ctk.CTk):
         self.F = Fonts(self)
         self.settings = Settings()
         self.games, self.load_errors = load_all()
-        self.library: Library | None = None
-        self.lib_games: dict[str, Game] = {}
-        self.lib_items: dict[str, SideItem] = {}
-        self.build_cache = BuildCache()
-        self._lib_busy = False
-        self._lib_job = None
-        self._picked = False                    # the user chose a game this session
         self.game: Game | None = None
         self.rows: dict[str, ModRow] = {}
         self.events: queue.Queue = queue.Queue()
@@ -361,13 +336,11 @@ class App(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.after(80, self._drain_events)
         self.after(2500, self.check_updates)
-        self._startup_game = str(self.settings.data.get("last_game") or "")
         if self.games:
-            last = self._startup_game
+            last = self.settings.data.get("last_game")
             self.select_game(next((g for g in self.games if g.id == last), self.games[0]), user=False)
         for e in self.load_errors:
             self.log("warn", f"Could not load game definition {e}")
-        self.after(300, self._load_library)
 
     # ------------------------------------------------------------------ layout
     def _build_sidebar(self):
@@ -387,7 +360,7 @@ class App(ctk.CTk):
             pass
         ctk.CTkLabel(brand, text=APP_NAME, font=F.d(21), text_color=C["text"]).pack(side="left")
 
-        ctk.CTkLabel(side, text="Verified", font=F.m(12), text_color=C["faint"], anchor="w").grid(
+        ctk.CTkLabel(side, text="Games", font=F.m(12), text_color=C["faint"], anchor="w").grid(
             row=1, column=0, sticky="ew", padx=22, pady=(0, 4))
         self.game_list = ctk.CTkFrame(side, fg_color="transparent")
         self.game_list.grid(row=2, column=0, sticky="new", padx=12)
@@ -398,29 +371,6 @@ class App(ctk.CTk):
             self.game_buttons[g.id] = b
         if not self.games:
             ctk.CTkLabel(self.game_list, text="No games found", font=F.b(13), text_color=C["muted"]).pack()
-
-        # community library: search + list
-        lh = ctk.CTkFrame(side, fg_color="transparent")
-        lh.grid(row=3, column=0, sticky="ew", padx=(22, 14), pady=(18, 4))
-        ctk.CTkLabel(lh, text="Community library", font=F.m(12), text_color=C["faint"], anchor="w").pack(side="left")
-        self.lib_refresh = ctk.CTkButton(lh, text="Refresh", width=10, height=20, font=F.b(11), fg_color="transparent",
-                                         hover_color=C["raised"], text_color=C["faint"],
-                                         command=lambda: self._download_library(manual=True))
-        self.lib_refresh.pack(side="right")
-        self.lib_search = ctk.CTkEntry(side, placeholder_text="Search games or title ID", font=F.b(13), height=32,
-                                       fg_color=C["raised"], border_color=C["line"], text_color=C["text"])
-        self.lib_search.grid(row=4, column=0, sticky="ew", padx=14, pady=(0, 6))
-        self.lib_search.bind("<KeyRelease>", lambda e: self._schedule_lib_filter())
-        self.lib_list = ctk.CTkScrollableFrame(side, fg_color="transparent", scrollbar_button_color=C["line"],
-                                               scrollbar_button_hover_color=C["faint"], corner_radius=0)
-        self.lib_list.grid(row=5, column=0, sticky="nsew", padx=(6, 4))
-        self.lib_list._parent_canvas.bind("<Configure>", lambda e: self.after(30, self._lib_scrollbar), add="+")
-        self.lib_msg = ctk.CTkLabel(side, text="Loading the community library…", font=F.b(12), text_color=C["faint"],
-                                    anchor="w", justify="left", wraplength=210)
-        self.lib_msg.grid(row=6, column=0, sticky="ew", padx=22, pady=(4, 0))
-        self.lib_get = ctk.CTkButton(side, text="Download library", height=30, font=F.m(12), fg_color=C["raised"],
-                                     hover_color=C["line"], text_color=C["text"],
-                                     command=lambda: self._download_library(manual=True))
 
         foot = ctk.CTkFrame(side, fg_color="transparent")
         foot.grid(row=8, column=0, sticky="sew", padx=14, pady=(10, 16))
@@ -504,8 +454,6 @@ class App(ctk.CTk):
             unselected_hover_color=C["line"], selected_color=C["amber"], selected_hover_color=C["amber_hi"],
             text_color=C["text"], command=self._version_changed)
         self.version_seg.pack(fill="x", padx=16)
-        self.ver_auto = ctk.CTkLabel(ver, text="  Detected automatically", font=F.m(13), height=36, corner_radius=6,
-                                     fg_color=C["raised"], text_color=C["text"], anchor="w")
         self.ver_msg = ctk.CTkLabel(ver, text="", font=F.b(12), text_color=C["faint"], anchor="w",
                                     wraplength=360, justify="left")
         self.ver_msg.pack(fill="x", padx=16, pady=(6, 12))
@@ -586,56 +534,27 @@ class App(ctk.CTk):
     def select_game(self, game: Game, user: bool = True):
         if self.busy:
             return
-        self._picked = self._picked or user
         self.game = game
         self.settings.data["last_game"] = game.id
         for gid, b in self.game_buttons.items():
             b.set_selected(gid == game.id)
-        for tid, b in self.lib_items.items():
-            b.set_selected(game.library is not None and tid == game.title_id)
         self._header_w = 0
         self._render_header()
         gs = self.settings.game(game.id)
-        lib = game.library is not None
-        if lib:
-            self.version_seg.pack_forget()
-            self.ver_auto.pack(fill="x", padx=16, before=self.ver_msg)
-            self.mod_buttons["Recommended"].pack_forget()
-        else:
-            self.ver_auto.pack_forget()
-            self.version_seg.pack(fill="x", padx=16, before=self.ver_msg)
-            if not self.mod_buttons["Recommended"].winfo_ismapped():
-                self.mod_buttons["Recommended"].pack(side="right", padx=(4, 0), after=self.mod_buttons["Clear"])
-            names = [v.name for v in game.versions]
-            self.version_seg.configure(values=names)
-            vid = gs.get("version", game.versions[0].id)
-            self.version_seg.set(game.version(vid).name if vid in {v.id for v in game.versions} else names[0])
+        names = [v.name for v in game.versions]
+        self.version_seg.configure(values=names)
+        vid = gs.get("version", game.versions[0].id)
+        self.version_seg.set(game.version(vid).name if vid in {v.id for v in game.versions} else names[0])
 
         for w in self.mod_frame.winfo_children():
             w.destroy()
         self.rows.clear()
-        self._notes = []
         r = 0
-        if lib:
-            note = ("Community patches were made for the Xenia emulator, and most haven't been tried on a real "
-                    "console. 360 LiveMods only applies them to the exact version of the game they were made "
-                    "for, but a patch can still misbehave on hardware: if the game crashes, untick the mods "
-                    "you added last.")
-            if any(g.title_id == game.title_id for g in self.games):
-                note += " This game also has a hand-tested page under Verified."
-            box = ctk.CTkFrame(self.mod_frame, fg_color=C["raised"], corner_radius=8)
-            box.grid(row=r, column=0, sticky="ew", padx=14, pady=(14, 0))
-            lbl = ctk.CTkLabel(box, text=note, font=self.F.b(12), text_color=C["muted"], anchor="w",
-                               justify="left", wraplength=560)
-            lbl.pack(fill="x", padx=14, pady=10)
-            self._notes.append(lbl)
-            r += 1
         cats: dict[str, list[Mod]] = {}
         for m in game.mods:
             cats.setdefault(m.category, []).append(m)
         for ci, (cat, mods) in enumerate(cats.items()):
-            ctk.CTkLabel(self.mod_frame, text=cat, font=self.F.d(15),
-                         text_color=C["err"] if cat == "Emulator fixes" else C["amber"], anchor="w").grid(
+            ctk.CTkLabel(self.mod_frame, text=cat, font=self.F.d(15), text_color=C["amber"], anchor="w").grid(
                 row=r, column=0, sticky="ew", padx=18, pady=(16 if ci == 0 else 22, 6))
             r += 1
             for m in mods:
@@ -655,14 +574,6 @@ class App(ctk.CTk):
             if want and row.mod.available_for(self.version_id) and row.mod.status != "unstable":
                 row.var.set(True)
         self.on_selection_changed()
-
-    def select_library_title(self, title_id: str, user: bool = True):
-        if self.busy or not self.library or title_id not in self.library.by_id:
-            return
-        g = self.lib_games.get(title_id)
-        if g is None:
-            g = self.lib_games[title_id] = to_game(self.library.by_id[title_id])
-        self.select_game(g, user)
 
     def _schedule_header(self, event=None):
         if self._header_job:
@@ -691,13 +602,9 @@ class App(ctk.CTk):
         width = max(320, self.mod_frame._parent_canvas.winfo_width() - 110)
         for row in self.rows.values():
             row.desc.configure(wraplength=width)
-        for lbl in getattr(self, "_notes", []):
-            lbl.configure(wraplength=width + 60)
 
     @property
     def version_id(self) -> str:
-        if self.game.library is not None:
-            return AUTO
         name = self.version_seg.get()
         return next(v.id for v in self.game.versions if v.name == name)
 
@@ -710,15 +617,9 @@ class App(ctk.CTk):
         self.on_selection_changed()
 
     def _apply_version_to_rows(self):
-        if self.game.library is not None:
-            vs = self.game.versions
-            known = (f"One known version (build {vs[0].id[:8]})" if len(vs) == 1 else
-                     f"{len(vs)} known versions: " + "; ".join(v.name for v in vs))
-            self.ver_msg.configure(text=f"Worked out on the console when the game starts. {known}.")
-        else:
-            v = self.game.version(self.version_id)
-            self.ver_msg.configure(text=f"{v.hint}. Must match the title update setting for "
-                                        f"{self.game.name} in Aurora/FSD.")
+        v = self.game.version(self.version_id)
+        self.ver_msg.configure(text=f"{v.hint}. Must match the title update setting for "
+                                    f"{self.game.name} in Aurora/FSD.")
         for row in self.rows.values():
             row.set_version(self.version_id)
 
@@ -806,19 +707,15 @@ class App(ctk.CTk):
         if not ip:
             return
         game, vid = self.game, self.version_id
-        lib = game.library is not None
         self._stop_fps()
-        self._fps_target = (ip, None if lib else game.version(vid))
+        self._fps_target = (ip, game.version(vid))
         if not self._log_visible:
             self._toggle_log()
         self.log("info", "─" * 46)
         self.log("info", f"{'Restoring' if restore else 'Starting'}: {game.name} · "
-                         f"{'version detected on the console' if lib else game.version(vid).name} · "
+                         f"{game.version(vid).name} · "
                          f"{', '.join(m.name for m in mods)}")
-        if lib:
-            self.engine = LibraryEngine(lambda k, m: self.events.put((k, m)), self.library, self.build_cache)
-        else:
-            self.engine = Engine(lambda k, m: self.events.put((k, m)))
+        self.engine = Engine(lambda k, m: self.events.put((k, m)))
         eng = self.engine
 
         def work():
@@ -839,10 +736,10 @@ class App(ctk.CTk):
 
     def _lock(self, on: bool):
         state = "disabled" if on else "normal"
-        for w in (self.version_seg, self.ip, self.test_btn, self.restore_btn, self.lib_search, self.lib_refresh,
+        for w in (self.version_seg, self.ip, self.test_btn, self.restore_btn,
                   *self.mod_buttons.values()):
             w.configure(state=state)
-        for b in (*self.game_buttons.values(), *self.lib_items.values()):
+        for b in self.game_buttons.values():
             b.configure(state=state)
         for r in self.rows.values():
             if r.mod.available_for(self.version_id):
@@ -882,13 +779,6 @@ class App(ctk.CTk):
                 self._set_status(msg, C["ok"], False, "Patches last until you quit the game.")
                 if low == "mods active":
                     self._start_fps()
-            elif low.startswith("restart"):
-                self._set_status("Restart the game", C["amber"], True,
-                                 f"Quit {self.game.name} to the dashboard and launch it again. "
-                                 "360 LiveMods keeps waiting.")
-            elif low.startswith("identifying"):
-                self._set_status("Identifying" + msg[msg.rfind("…"):] if "…" in msg else msg, C["amber"], True,
-                                 f"First time with this version of {self.game.name} only. Keep the game running.")
             # match fixed prefixes only: game names can contain any word ("XCOM: Enemy Unknown")
             elif low.startswith(("wrong game version", "game not running", "couldn't reach the game")):
                 self._set_status(msg, C["err"], False, "See the activity log for details.")
@@ -900,8 +790,6 @@ class App(ctk.CTk):
                 self._set_status(msg, C["amber"], True)
         elif kind.startswith("update_"):
             self._handle_update(kind, msg)
-        elif kind.startswith("lib_"):
-            self._handle_library(kind, msg)
         elif kind == "fps":
             fps, avg, low_ = msg
             self.fps_val.configure(text=f"{fps:.0f}",
@@ -914,11 +802,6 @@ class App(ctk.CTk):
                                  msg + " Press Start before launching it again.")
         elif kind == "done":
             self._lock(False)
-            if getattr(self, "_lib_reselect", False):
-                self._lib_reselect = False
-                if self.game is not None and self.game.library is not None and self.library \
-                        and self.game.title_id in self.library.by_id:
-                    self.select_library_title(self.game.title_id, user=False)
             if self.status.cget("text").startswith(("Waiting", "Connecting", "Stopping")):
                 self._set_status("Ready", C["faint"], False, "Press Start, then launch the game on your console.")
         else:
@@ -939,140 +822,6 @@ class App(ctk.CTk):
         else:
             self.logbox.grid_remove()
             self.log_toggle.configure(text="Show activity log")
-
-    # --------------------------------------------------------- community library
-    def _load_library(self):
-        def work():
-            try:
-                lib = load_library()
-            except Exception as e:  # noqa: BLE001
-                self.events.put(("lib_error", f"Couldn't read the library: {e}"))
-                lib = None
-            self.events.put(("lib_loaded", lib))
-            if needs_refresh(lib):
-                self.events.put(("lib_fetch", ""))
-        threading.Thread(target=work, daemon=True).start()
-
-    def _download_library(self, manual: bool = False):
-        if self._lib_busy:
-            return
-        self._lib_busy = True
-        self.lib_refresh.configure(state="disabled", text="…")
-        self.lib_get.grid_remove()
-        self.lib_msg.configure(text="Downloading the community library…", text_color=C["faint"])
-
-        def work():
-            try:
-                lib = download_library(lambda d, t: self.events.put(("lib_progress", (d, t))))
-                self.events.put(("lib_loaded", lib))
-                self.events.put(("lib_done", ""))
-            except Exception as e:  # noqa: BLE001 - offline, GitHub down...
-                self.events.put(("lib_error", "Couldn't download the community library."
-                                              if not manual else f"Couldn't download the community library ({e})."))
-        threading.Thread(target=work, daemon=True).start()
-
-    def _schedule_lib_filter(self):
-        if self._lib_job:
-            self.after_cancel(self._lib_job)
-        self._lib_job = self.after(180, self._fill_lib_list)
-
-    def _fill_lib_list(self):
-        self._lib_job = None
-        for w in self.lib_list.winfo_children():
-            w.destroy()
-        self.lib_items.clear()
-        lib = self.library
-        if not lib or not lib.titles:
-            self.after(60, self._lib_scrollbar)
-            return
-        found = lib.search(self.lib_search.get())
-        sel = self.game.title_id if self.game is not None and self.game.library is not None else None
-        for t in found[:LIB_SHOWN]:
-            n = t.patch_count
-            item = SideItem(self.lib_list, self, t.name, f"{t.title_id} · {n} patch{'es' * (n != 1)}",
-                            lambda tid=t.title_id: self.select_library_title(tid), compact=True)
-            item.pack(fill="x", pady=1)
-            item.set_selected(t.title_id == sel)
-            if self.busy:
-                item.configure(state="disabled")
-            self.lib_items[t.title_id] = item
-        self.lib_list._parent_canvas.yview_moveto(0)
-        self.after(60, self._lib_scrollbar)
-        q = self.lib_search.get().strip()
-        if not found:
-            self.lib_msg.configure(text=f"No game matches “{q}”.", text_color=C["faint"])
-        elif len(found) > LIB_SHOWN:
-            self.lib_msg.configure(text=f"Showing {LIB_SHOWN} of {len(found)}. Type to find the rest.",
-                                   text_color=C["faint"])
-        else:
-            self.lib_msg.configure(text=self._lib_summary() if not q else f"{len(found)} found.",
-                                   text_color=C["faint"])
-
-    def _lib_scrollbar(self):
-        """Hide the list's scrollbar when everything fits."""
-        try:
-            canvas, bar = self.lib_list._parent_canvas, self.lib_list._scrollbar
-            self.update_idletasks()
-            box = canvas.bbox("all")
-            if box and box[3] - box[1] <= canvas.winfo_height():
-                bar.grid_remove()
-            else:
-                bar.grid()
-        except Exception:  # noqa: BLE001 - cosmetic only
-            pass
-
-    def _lib_summary(self) -> str:
-        lib = self.library
-        if not lib:
-            return ""
-        import time as _t
-        days = int((_t.time() - lib.fetched_at) // 86400) if lib.fetched_at else None
-        when = "" if days is None else (" · updated today" if days == 0 else
-                                        f" · updated {days} day{'s' * (days != 1)} ago")
-        return f"{len(lib)} games{when}"
-
-    def _handle_library(self, kind: str, data):
-        if kind == "lib_loaded":
-            if data is None:
-                return
-            self.library = data
-            self.lib_games.clear()
-            self.lib_search.configure(placeholder_text=f"Search {len(data)} games or title ID" if data.titles
-                                      else "Search games or title ID")
-            if self.game is not None and self.game.library is not None:
-                if self.busy:
-                    self._lib_reselect = True        # refresh the page once the run ends
-                elif self.game.title_id in data.by_id:
-                    self.select_library_title(self.game.title_id, user=False)
-            elif not self._picked and self._startup_game.startswith("lib-"):
-                self.select_library_title(self._startup_game[4:], user=False)
-            self._fill_lib_list()
-            if data.titles:
-                self.lib_get.grid_remove()
-            else:
-                self.lib_msg.configure(text="Hundreds of games have community patches. Download the library "
-                                            "to see them (about 1 MB, from GitHub).", text_color=C["muted"])
-                self.lib_get.grid(row=7, column=0, sticky="ew", padx=22, pady=(6, 0))
-        elif kind == "lib_fetch":
-            self._download_library()
-        elif kind == "lib_progress":
-            done, total = data
-            pct = f" {done * 100 // total}%" if total else f" {done // 1024} KB"
-            self.lib_msg.configure(text=f"Downloading the community library…{pct}", text_color=C["faint"])
-        elif kind == "lib_done":
-            self._lib_busy = False
-            self.lib_refresh.configure(state="disabled" if self.busy else "normal", text="Refresh")
-            self.log("ok", f"Community library updated: {len(self.library)} games.")
-        elif kind == "lib_error":
-            self._lib_busy = False
-            self.lib_refresh.configure(state="disabled" if self.busy else "normal", text="Refresh")
-            if self.library and self.library.titles:
-                self.lib_msg.configure(text=self._lib_summary() + " · couldn't refresh", text_color=C["faint"])
-                self.log("warn", data)
-            else:
-                self.lib_msg.configure(text=data + " Check your internet connection.", text_color=C["err"])
-                self.lib_get.configure(text="Try again")
-                self.lib_get.grid(row=7, column=0, sticky="ew", padx=22, pady=(6, 0))
 
     # ---------------------------------------------------------------- updates
     def check_updates(self, manual: bool = False):

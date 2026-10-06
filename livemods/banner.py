@@ -135,7 +135,7 @@ def render_banner(game, width: int, height: int = HEADER_H, scale: float = 2.0) 
     tid_w = d.textlength(tid_text, font=f_tid)
     room = W - 2 * pad
 
-    # the name: shrink to fit (long library titles), then ellipsize as a last resort
+    # the name: shrink to fit (long names), then ellipsize as a last resort
     size = 44
     while True:
         f_name = _font("ChakraPetch-SemiBold.ttf", round(size * scale))
@@ -146,9 +146,7 @@ def render_banner(game, width: int, height: int = HEADER_H, scale: float = 2.0) 
     name = _ellipsize(d, name, f_name, room)
     tid_inline = d.textlength(name, font=f_name) + round(16 * scale) + tid_w <= room
     desc = _ellipsize(d, game.description, f_desc, room)
-    kicker = "COMMUNITY LIBRARY" if getattr(game, "library", None) else ""
-    if kicker and not tid_inline:
-        kicker += f"   ·   {tid_text.upper()}"
+    kicker = "" if tid_inline else tid_text.upper()      # title ID above the name if it won't fit beside it
 
     # layout from the bottom up
     desc_h = f_desc.getbbox("Ag")[3]

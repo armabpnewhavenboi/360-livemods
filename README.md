@@ -24,27 +24,6 @@ and everything is back to normal.
 Because the game files stay untouched, it works with your normal installed copy (disc, GOD or
 extracted), and with **your existing saves**.
 
-### Community library: 300+ games
-
-Besides the hand-tested games below, the app brings the [Xenia community patch library](https://github.com/xenia-canary/game-patches)
-to real consoles: 60 FPS unlocks, resolution and anti-aliasing tweaks, removing blur and bloom,
-skipping intros and more, for over 300 games. Pick a game under **Community library** in the
-sidebar (search by name or title ID), tick patches and press Start.
-
-How it stays safe: every library patch file is made for one exact build of a game, named by a hash
-of its code. The first time you play a version, 360 LiveMods reads the game's code over XBDM and
-computes that same hash (about a minute, once per version). Patches are only applied when it
-matches, so a patch can never land on the wrong version. From then on the game is recognised the
-moment it loads and patched before it runs.
-
-<p align="center">
-  <img src="docs/screenshot-library.png" width="720" alt="A community library game">
-</p>
-
-Library patches were written for the Xenia emulator and most haven't been tried on a real console,
-so they're marked **Community**. Patches that only work around emulator problems are marked
-**Emulator fix** and ask before you enable them. If a game crashes, untick the patches you added last.
-
 ### Fable II
 
 | Mod | Base game | Title update |
@@ -122,14 +101,6 @@ choose **Title Update**. The app will tell you if it detects the other version.
 Untick mods one at a time to find the one causing it, and please open an issue with the activity
 log so it can be fixed or marked for that version.
 
-**A library game says "Restart the game"**
-That's the one-time identification finishing. Quit the game to the dashboard and start it again
-while 360 LiveMods is still waiting: the patches go in the moment it loads.
-
-**"Isn't any version of … in the community library"**
-Your copy is a build nobody has made patches for yet (or a different game was started). Nothing
-was written.
-
 **Nothing looks different**
 Start 360 LiveMods *before* launching the game. Some settings are only read while the game boots.
 
@@ -141,9 +112,6 @@ The same engine is available without the window, for scripts and power users:
 360LiveMods.exe --list
 360LiveMods.exe fable2 --ip 192.168.1.50 --version tu --mods bloom,motion_blur,dof,fog,fps60
 360LiveMods.exe fable2 --ip 192.168.1.50 --version base --all
-360LiveMods.exe --update-library
-360LiveMods.exe --library halo
-360LiveMods.exe 4D5307E6 --ip 192.168.1.50 --mods "60 FPS"
 ```
 
 From source, use `python -m livemods` with the same arguments.
@@ -171,11 +139,10 @@ GitHub Actions build the installer and portable zip and attach them to that rele
 
 - **punchbrotv**: Fable II bloom, motion blur, depth of field and fog patches ([fable2patch](https://github.com/punchbrotv/fable2patch))
 - **Margen67**: Fable II 60 FPS, 1280x720 and MSAA patches
-- **Guy**: Fable II tick-rate patch
+- **Guy, Ultra**: Fable II tick-rate, website items and Collector's Edition patches
+- **Pepper**: Fable II ultrawide patches
 - The original patches were written for the Xenia emulator. 360 LiveMods ported them to real
   hardware and to Fable II's title update, and fixed the fog patch's title-update crash.
-- **Community library**: the patch authors of [xenia-canary/game-patches](https://github.com/xenia-canary/game-patches).
-  The library isn't bundled; the app downloads it from GitHub, and each patch shows its author.
 - Fonts: Chakra Petch and IBM Plex, under the SIL Open Font License
 
 ## Disclaimer
