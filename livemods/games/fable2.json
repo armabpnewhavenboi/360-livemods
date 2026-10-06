@@ -169,6 +169,40 @@
       }
     },
     {
+      "id": "light_shadows_off",
+      "name": "Turn off lamp and torch shadows",
+      "category": "Performance",
+      "description": "Stops lamps, torches, fires and other placed lights from casting live shadows. The sun's shadows are baked into the world and stay. Saves the most in towns at night and in caves.",
+      "default": false,
+      "status": "experimental",
+      "credit": "360 LiveMods",
+      "patches": {
+        "base": [
+          ["0x8255F4B8", "889F0085", "38800000"]
+        ],
+        "tu": [
+          ["0x825C22E0", "889F0085", "38800000"]
+        ]
+      }
+    },
+    {
+      "id": "ss_shadows_off",
+      "name": "Turn off screen-space light shadows",
+      "category": "Performance",
+      "description": "Skips the extra full-screen shadow pass the game uses for large lights. Lighter than turning light shadows off completely; has no effect if that is already on.",
+      "default": false,
+      "status": "experimental",
+      "credit": "360 LiveMods",
+      "patches": {
+        "base": [
+          ["0x8255F564", "895F0086", "39400000"]
+        ],
+        "tu": [
+          ["0x825C238C", "895F0086", "39400000"]
+        ]
+      }
+    },
+    {
       "id": "vsync",
       "name": "Fix screen tearing (V-Sync)",
       "category": "Performance",
