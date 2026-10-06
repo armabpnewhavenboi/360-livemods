@@ -150,6 +150,23 @@
       }
     },
     {
+      "id": "vsync",
+      "name": "Fix screen tearing (V-Sync)",
+      "category": "Performance",
+      "description": "Makes every frame wait for the TV's refresh, so the picture never tears. When the game can't keep up, the frame rate drops a step instead of tearing, so busy areas can feel less smooth.",
+      "default": false,
+      "status": "experimental",
+      "credit": "360 LiveMods",
+      "patches": {
+        "base": [
+          ["0x82B9C908", "554A4E7E", "39400000"]
+        ],
+        "tu": [
+          ["0x82BA3078", "554A4E7E", "39400000"]
+        ]
+      }
+    },
+    {
       "id": "res720",
       "name": "Native 720p (no MSAA)",
       "category": "Performance",

@@ -34,6 +34,7 @@ extracted), and with **your existing saves**.
 | Remove distance fog | ✅ | ✅ |
 | Remove screen overlay | 🧪 experimental | 🧪 experimental |
 | 60 FPS | ✅ | ✅ |
+| Fix screen tearing (V-Sync) | 🧪 experimental | 🧪 experimental |
 | Native 720p (no MSAA) | ✅ | ❌ crashes on the update |
 | 30 Hz tick rate | ⚠️ unstable | ❌ |
 

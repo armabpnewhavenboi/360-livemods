@@ -1,7 +1,8 @@
 # Changelog
 
 ## 1.2.0
-- Fable II: new experimental mod, Remove screen overlay (base game and title update).
+- Fable II: new experimental mods, Remove screen overlay and Fix screen tearing (V-Sync), for both
+  the base game and the title update.
 
 ## 1.1.0
 - Built-in updater: the app checks GitHub for new releases at startup (or via "Check for updates")
