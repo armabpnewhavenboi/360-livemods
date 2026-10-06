@@ -37,13 +37,15 @@ class Mod:
     description: str
     category: str
     default: bool
-    status: str                      # "tested" | "experimental" | "unstable"
+    status: str                      # "tested" | "experimental" | "unstable" | "community"
     credit: str
     warning: str
     patches: dict[str, list[Patch]]  # version id -> patches
     unavailable: dict[str, str]      # version id -> reason shown in the UI
 
     def available_for(self, version_id: str) -> bool:
+        if version_id == "*":            # library games: the version is worked out on the console
+            return any(v not in self.unavailable for v in self.patches)
         return version_id in self.patches and version_id not in self.unavailable
 
 
@@ -60,6 +62,7 @@ class Game:
     source: str = ""
     banner: Path | None = None                 # header art; a user file overrides the bundled one
     banner_focus: tuple[float, float] = (0.5, 0.5)
+    library: object = None                     # LibTitle for community-library games, else None
 
     def version(self, version_id: str) -> Version:
         for v in self.versions:

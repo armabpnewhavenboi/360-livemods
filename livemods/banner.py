@@ -13,6 +13,41 @@ LINE = (50, 56, 67)
 TEXT = (238, 240, 243)
 MUTED = (200, 205, 214)
 FAINT = (160, 168, 180)
+AMBER = (242, 179, 61)
+
+
+def _ellipsize(d: ImageDraw.ImageDraw, text: str, font, width: float) -> str:
+    if d.textlength(text, font=font) <= width:
+        return text
+    while text and d.textlength(text + "…", font=font) > width:
+        text = text[:-1]
+    return text.rstrip() + "…"
+
+
+def _generated_art(canvas: Image.Image, game, W: int, H: int, scale: float) -> None:
+    """Header art for games without a banner: a warm glow and the title ID set large and faint."""
+    glow = Image.new("RGB", (W, H), (58, 46, 24))
+    canvas.paste(glow, mask=_gradient(W, H, True, [(0, 0), (0.45, 0), (1, 120)]))
+    canvas.paste(Image.new("RGB", (W, H), BG), mask=_gradient(W, H, False, [(0, 60), (0.5, 0), (1, 150)]))
+    big = _font("ChakraPetch-SemiBold.ttf", round(H * 0.62))
+    layer = Image.new("L", (W, H), 0)
+    ld = ImageDraw.Draw(layer)
+    text = game.title_id
+    tw = ld.textlength(text, font=big)
+    box = ld.textbbox((0, 0), text, font=big)
+    ld.text((W - tw - round(18 * scale), round(H * 0.08) - box[1]), text, font=big, fill=30)
+    keep = _gradient(W, H, True, [(0, 0), (0.42, 0), (0.85, 255), (1, 255)])   # clear behind the name
+    layer = Image.composite(layer, Image.new("L", (W, H), 0), keep)
+    canvas.paste(Image.new("RGB", (W, H), (255, 214, 140)), mask=layer)
+    # fine diagonal hatching on the right, fading out towards the text
+    hatch = Image.new("L", (W, H), 0)
+    hd = ImageDraw.Draw(hatch)
+    step = round(14 * scale)
+    for x in range(-H, W, step):
+        hd.line([(x, H), (x + H, 0)], fill=14, width=max(1, round(scale)))
+    fade = _gradient(W, H, True, [(0, 0), (0.5, 0), (1, 255)])
+    hatch = Image.composite(hatch, Image.new("L", (W, H), 0), fade)
+    canvas.paste(Image.new("RGB", (W, H), (255, 220, 160)), mask=hatch)
 
 
 def _asset(*parts: str) -> Path:
@@ -89,35 +124,59 @@ def render_banner(game, width: int, height: int = HEADER_H, scale: float = 2.0) 
         except OSError:
             pass
     else:
-        glow = Image.new("RGB", (W, H), (34, 38, 46))
-        canvas.paste(glow, mask=_gradient(W, H, True, [(0, 255), (1, 0)]))
+        _generated_art(canvas, game, W, H, scale)
 
     d = ImageDraw.Draw(canvas)
     pad = round(30 * scale)
-    f_name = _font("ChakraPetch-SemiBold.ttf", round(44 * scale))
     f_tid = _font("IBMPlexMono-Regular.ttf", round(12 * scale))
     f_desc = _font("IBMPlexSans-Regular.ttf", round(15 * scale))
+    f_kick = _font("IBMPlexSans-Medium.ttf", round(11 * scale))
+    tid_text = f"Title ID {game.title_id}"
+    tid_w = d.textlength(tid_text, font=f_tid)
+    room = W - 2 * pad
+
+    # the name: shrink to fit (long library titles), then ellipsize as a last resort
+    size = 44
+    while True:
+        f_name = _font("ChakraPetch-SemiBold.ttf", round(size * scale))
+        name = game.name
+        if d.textlength(name, font=f_name) <= room or size <= 26:
+            break
+        size -= 2
+    name = _ellipsize(d, name, f_name, room)
+    tid_inline = d.textlength(name, font=f_name) + round(16 * scale) + tid_w <= room
+    desc = _ellipsize(d, game.description, f_desc, room)
+    kicker = "COMMUNITY LIBRARY" if getattr(game, "library", None) else ""
+    if kicker and not tid_inline:
+        kicker += f"   ·   {tid_text.upper()}"
 
     # layout from the bottom up
     desc_h = f_desc.getbbox("Ag")[3]
     y_desc = H - pad - desc_h
-    name_box = d.textbbox((0, 0), game.name, font=f_name)
+    name_box = d.textbbox((0, 0), name, font=f_name)
     name_h = name_box[3] - name_box[1]
     y_name = y_desc - round(10 * scale) - name_h - name_box[1]
+    y_kick = y_name + name_box[1] - round(12 * scale) - f_kick.getbbox("A")[3]
 
     # soft shadow behind the text for legibility over bright art
     shadow = Image.new("L", (W, H), 0)
     sd = ImageDraw.Draw(shadow)
-    sd.text((pad, y_name), game.name, font=f_name, fill=200)
-    sd.text((pad, y_desc), game.description, font=f_desc, fill=160)
+    sd.text((pad, y_name), name, font=f_name, fill=200)
+    sd.text((pad, y_desc), desc, font=f_desc, fill=160)
     shadow = shadow.filter(ImageFilter.GaussianBlur(round(6 * scale)))
     canvas.paste(Image.new("RGB", (W, H), (8, 9, 11)), mask=shadow)
 
-    d.text((pad, y_name), game.name, font=f_name, fill=TEXT)
-    tid_x = pad + name_box[2] + round(16 * scale)
-    d.text((tid_x, y_name + name_box[3] - f_tid.getbbox("A")[3] - round(4 * scale)),
-           f"Title ID {game.title_id}", font=f_tid, fill=FAINT)
-    d.text((pad, y_desc), game.description, font=f_desc, fill=MUTED)
+    if kicker:
+        x = pad
+        for ch in kicker:                       # letter-spaced small caps
+            d.text((x, y_kick), ch, font=f_kick, fill=AMBER)
+            x += d.textlength(ch, font=f_kick) + round(1.6 * scale)
+    d.text((pad, y_name), name, font=f_name, fill=TEXT)
+    if tid_inline:
+        tid_x = pad + d.textlength(name, font=f_name) + round(16 * scale)
+        d.text((tid_x, y_name + name_box[3] - f_tid.getbbox("A")[3] - round(4 * scale)),
+               tid_text, font=f_tid, fill=FAINT)
+    d.text((pad, y_desc), desc, font=f_desc, fill=MUTED)
 
     # rounded corners + hairline border, matching the cards below
     r = round(12 * scale)
