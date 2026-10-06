@@ -56,6 +56,8 @@ class Game:
     mods: list[Mod]
     credits: list[str] = field(default_factory=list)
     source: str = ""
+    banner: Path | None = None                 # header art; a user file overrides the bundled one
+    banner_focus: tuple[float, float] = (0.5, 0.5)
 
     def version(self, version_id: str) -> Version:
         for v in self.versions:
@@ -104,10 +106,19 @@ def load_game(path: Path) -> Game:
             warning=m.get("warning", ""), patches=patches,
             unavailable=dict(m.get("unavailable", {})),
         ))
+    b = raw.get("banner") or {}
+    banner = None
+    for cand in [user_dir() / f"{raw['id']}_banner.{ext}" for ext in ("png", "jpg", "jpeg")] + \
+                ([path.parent / b["file"]] if b.get("file") else []):
+        if cand.is_file():
+            banner = cand
+            break
+    focus = tuple(b.get("focus", (0.5, 0.5)))
     return Game(
         id=raw["id"], name=raw["name"], title_id=raw["title_id"],
         description=raw.get("description", ""), notes=raw.get("notes", []),
         versions=versions, mods=mods, credits=raw.get("credits", []), source=str(path),
+        banner=banner, banner_focus=(float(focus[0]), float(focus[1])),
     )
 
 

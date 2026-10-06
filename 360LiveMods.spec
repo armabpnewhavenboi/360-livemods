@@ -2,7 +2,8 @@
 from PyInstaller.utils.hooks import collect_data_files
 
 datas = collect_data_files("customtkinter")
-datas += [("livemods/games/*.json", "livemods/games"), ("assets", "assets")]
+datas += [("livemods/games/*.json", "livemods/games"), ("livemods/games/*.jpg", "livemods/games"),
+          ("assets", "assets")]
 
 a = Analysis(["run.py"], pathex=["."], datas=datas, hiddenimports=["PIL._tkinter_finder"],
              excludes=["pytest", "numpy"], noarchive=False)

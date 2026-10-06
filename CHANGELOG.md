@@ -1,6 +1,8 @@
 # Changelog
 
-## 1.0.1
+## 1.1.0
+- Game banners: each game can show header art behind its name (Fable II included).
+  Drop `<game id>_banner.jpg` or `.png` into `%APPDATA%\360LiveMods\games` to use your own.
 - Fixed the mods list not scrolling: only the first few mods were reachable until the window was resized.
 
 ## 1.0.0

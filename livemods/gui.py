@@ -15,6 +15,7 @@ from . import APP_NAME, __version__
 from .config import Settings
 from .engine import Engine
 from .games import Game, Mod, load_all, user_dir
+from .banner import HEADER_H, render_banner
 from .xbdm import test_connection
 
 REPO_URL = "https://github.com/armabpnewhavenboi/360-livemods"
@@ -267,7 +268,8 @@ class AboutDialog(ctk.CTkToplevel):
         for g in app.games:
             lines.append(f"\n{g.name}")
             lines += [f"  • {c}" for c in g.credits]
-        lines += ["", "Fonts: Chakra Petch and IBM Plex (SIL Open Font License).", "",
+        lines += ["", "Fonts: Chakra Petch and IBM Plex (SIL Open Font License).",
+                  "Game artwork belongs to its respective owners and is shown only to identify the game.", "",
                   f"Extra game definitions can be added to:\n{user_dir()}", "",
                   "Not affiliated with Microsoft, Xbox or any game publisher. Use at your own risk; "
                   "back up your saves."]
@@ -364,17 +366,12 @@ class App(ctk.CTk):
         main.grid_columnconfigure(0, weight=1)
         main.grid_rowconfigure(3, weight=1)
 
-        # header
-        head = ctk.CTkFrame(main, fg_color="transparent")
-        head.grid(row=0, column=0, sticky="ew")
-        top = ctk.CTkFrame(head, fg_color="transparent")
-        top.pack(fill="x")
-        self.h_name = ctk.CTkLabel(top, text="", font=F.d(34), text_color=C["text"], anchor="w")
-        self.h_name.pack(side="left")
-        self.h_tid = ctk.CTkLabel(top, text="", font=F.mono_f(12), text_color=C["faint"], anchor="w")
-        self.h_tid.pack(side="left", padx=(14, 0), pady=(12, 0))
-        self.h_desc = ctk.CTkLabel(head, text="", font=F.b(14), text_color=C["muted"], anchor="w")
-        self.h_desc.pack(fill="x")
+        # header: game banner with the name drawn over it (rendered with Pillow, see banner.py)
+        self.header = ctk.CTkLabel(main, text="", fg_color="transparent")
+        self.header.grid(row=0, column=0, sticky="ew")
+        self._header_w = 0
+        self._header_job = None
+        main.bind("<Configure>", self._schedule_header, add="+")
 
         # setup row: console + version
         setup = ctk.CTkFrame(main, fg_color="transparent")
@@ -478,9 +475,8 @@ class App(ctk.CTk):
         self.settings.data["last_game"] = game.id
         for gid, b in self.game_buttons.items():
             b.set_selected(gid == game.id)
-        self.h_name.configure(text=game.name)
-        self.h_tid.configure(text=f"Title ID {game.title_id}")
-        self.h_desc.configure(text=game.description)
+        self._header_w = 0
+        self._render_header()
         names = [v.name for v in game.versions]
         self.version_seg.configure(values=names)
         gs = self.settings.game(game.id)
@@ -511,6 +507,25 @@ class App(ctk.CTk):
             if want and row.mod.available_for(self.version_id) and row.mod.status != "unstable":
                 row.var.set(True)
         self.on_selection_changed()
+
+    def _schedule_header(self, event=None):
+        if self._header_job:
+            self.after_cancel(self._header_job)
+        self._header_job = self.after(60, self._render_header)
+
+    def _render_header(self):
+        self._header_job = None
+        if not self.game:
+            return
+        w = self.header.master.winfo_width()
+        if w < 200 or w == self._header_w:
+            return
+        self._header_w = w
+        scale = ctk.ScalingTracker.get_window_scaling(self)
+        logical_w = max(200, round(w / scale))            # winfo_width is in physical pixels
+        img = render_banner(self.game, logical_w, HEADER_H, scale * 2)
+        self._header_img = ctk.CTkImage(img, size=(logical_w, HEADER_H))
+        self.header.configure(image=self._header_img)
 
     def _rewrap(self, event=None):
         width = max(320, self.mod_frame._parent_canvas.winfo_width() - 110)

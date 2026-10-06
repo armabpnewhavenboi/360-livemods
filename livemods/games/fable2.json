@@ -4,6 +4,7 @@
   "name": "Fable II",
   "title_id": "4D5307F1",
   "description": "Strip the haze, glow and smear from Albion and unlock the frame rate.",
+  "banner": { "file": "fable2_banner.jpg", "focus": [0.5, 0.12] },
   "notes": [
     "Pick the version that matches your console: if Fable II's title update is enabled in Aurora/FSD, choose Title Update.",
     "Changes last until you quit the game. Start 360 LiveMods before launching Fable II every time you play."

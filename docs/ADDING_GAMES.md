@@ -15,6 +15,8 @@ the same `id` overrides the built-in one.
   "description": "One line shown under the game name.",
   "notes": ["Optional extra notes."],
   "credits": ["Who made which patch."],
+  "banner": { "file": "fable2_banner.jpg", "focus": [0.5, 0.12] },  // optional header art next to this file;
+                                        // focus = which part to keep when cropping (x, y from 0 to 1)
 
   "versions": [                         // one entry per executable the game can run as
     {

@@ -105,8 +105,8 @@ From source, use `python -m livemods` with the same arguments.
 
 ## Adding games
 
-Every game is a single JSON file in [`livemods/games/`](livemods/games). No code changes are
-needed. See **[docs/ADDING_GAMES.md](docs/ADDING_GAMES.md)**. Definitions can also be dropped into
+Every game is a single JSON file in [`livemods/games/`](livemods/games), plus an optional banner
+image. No code changes are needed. See **[docs/ADDING_GAMES.md](docs/ADDING_GAMES.md)**. Definitions can also be dropped into
 `%APPDATA%\360LiveMods\games` to try them without rebuilding.
 
 ## Building from source
@@ -132,6 +132,9 @@ GitHub Actions build the installer and portable zip and attach them to that rele
 - Fonts: Chakra Petch and IBM Plex, under the SIL Open Font License
 
 ## Disclaimer
+
+Fable II artwork © Microsoft Corporation / Lionhead Studios, shown only to identify the game.
+It will be removed on request from the rights holder.
 
 Not affiliated with or endorsed by Microsoft, Xbox, Lionhead or any game publisher. This tool does
 not contain or distribute game code. Use it at your own risk and back up your saves.
