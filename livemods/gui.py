@@ -15,6 +15,7 @@ from . import APP_NAME, __version__
 from .config import Settings
 from .engine import Engine
 from .games import Game, Mod, load_all, user_dir
+from . import updater
 from .banner import HEADER_H, render_banner
 from .xbdm import test_connection
 
@@ -312,6 +313,7 @@ class App(ctk.CTk):
         self._build_main()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.after(80, self._drain_events)
+        self.after(2500, self.check_updates)
         if self.games:
             last = self.settings.data.get("last_game")
             self.select_game(next((g for g in self.games if g.id == last), self.games[0]))
@@ -348,12 +350,35 @@ class App(ctk.CTk):
             ctk.CTkLabel(self.game_list, text="No games found", font=F.b(13), text_color=C["muted"]).pack()
 
         foot = ctk.CTkFrame(side, fg_color="transparent")
-        foot.grid(row=4, column=0, sticky="sew", padx=20, pady=18)
-        ctk.CTkButton(foot, text="About & credits", font=F.b(13), anchor="w", fg_color="transparent",
-                      hover_color=C["raised"], text_color=C["muted"], height=30,
-                      command=lambda: AboutDialog(self)).pack(fill="x")
-        ctk.CTkLabel(foot, text=f"v{__version__}", font=F.b(11), text_color=C["faint"], anchor="w").pack(
-            fill="x", padx=8, pady=(4, 0))
+        foot.grid(row=4, column=0, sticky="sew", padx=14, pady=16)
+
+        # update card - hidden until a newer release is found
+        self.upd_card = ctk.CTkFrame(foot, fg_color=C["raised"], corner_radius=10, border_width=1,
+                                     border_color=_mix(C["amber"], C["panel"], 0.45))
+        self.upd_title = ctk.CTkLabel(self.upd_card, text="Update available", font=F.d(15),
+                                      text_color=C["amber"], anchor="w")
+        self.upd_title.pack(fill="x", padx=14, pady=(10, 0))
+        self.upd_sub = ctk.CTkLabel(self.upd_card, text="", font=F.b(12), text_color=C["muted"], anchor="w",
+                                    justify="left", wraplength=170)
+        self.upd_sub.pack(fill="x", padx=14)
+        self.upd_btn = ctk.CTkButton(self.upd_card, text="Update now", height=32, font=F.m(13),
+                                     fg_color=C["amber"], hover_color=C["amber_hi"], text_color=C["amber_ink"],
+                                     command=self.install_update)
+        self.upd_btn.pack(fill="x", padx=14, pady=(8, 12))
+        self._update = None
+
+        self.about_btn = ctk.CTkButton(foot, text="About & credits", font=F.b(13), anchor="w",
+                                       fg_color="transparent", hover_color=C["raised"], text_color=C["muted"],
+                                       height=30, command=lambda: AboutDialog(self))
+        self.about_btn.pack(fill="x", padx=6)
+        vrow = ctk.CTkFrame(foot, fg_color="transparent")
+        vrow.pack(fill="x", padx=14, pady=(4, 0))
+        self.ver_lbl = ctk.CTkLabel(vrow, text=f"v{__version__}", font=F.b(11), text_color=C["faint"], anchor="w")
+        self.ver_lbl.pack(side="left")
+        self.check_btn = ctk.CTkButton(vrow, text="Check for updates", width=10, height=22, font=F.b(11),
+                                       fg_color="transparent", hover_color=C["raised"], text_color=C["faint"],
+                                       command=lambda: self.check_updates(manual=True))
+        self.check_btn.pack(side="right")
 
     def _card(self, master, **kw) -> ctk.CTkFrame:
         return ctk.CTkFrame(master, fg_color=C["panel"], corner_radius=10, border_width=1,
@@ -710,6 +735,8 @@ class App(ctk.CTk):
                 self._set_status("Stopped", C["faint"], False, "Press Start, then launch the game on your console.")
             else:
                 self._set_status(msg, C["amber"], True)
+        elif kind.startswith("update_"):
+            self._handle_update(kind, msg)
         elif kind == "done":
             self._lock(False)
             if self.status.cget("text").startswith(("Waiting", "Connecting", "Stopping")):
@@ -732,6 +759,72 @@ class App(ctk.CTk):
         else:
             self.logbox.grid_remove()
             self.log_toggle.configure(text="Show activity log")
+
+    # ---------------------------------------------------------------- updates
+    def check_updates(self, manual: bool = False):
+        if manual:
+            self.check_btn.configure(text="Checking…", state="disabled")
+
+        def work():
+            try:
+                rel = updater.check()
+                self.events.put(("update_available", rel) if rel else ("update_none", manual))
+            except Exception:  # noqa: BLE001 - offline etc.; stay quiet unless asked
+                self.events.put(("update_error", manual))
+        threading.Thread(target=work, daemon=True).start()
+
+    def install_update(self):
+        rel = self._update
+        if not rel:
+            return
+        if not (updater.is_installed_copy() and rel.setup_url):
+            webbrowser.open(rel.page_url)
+            return
+        if self.busy:
+            self.upd_sub.configure(text="Stop the current run first.")
+            return
+        self.upd_btn.configure(state="disabled", text="Downloading…")
+
+        def work():
+            try:
+                path = updater.download(rel, lambda d, t: self.events.put(("update_progress", (d, t))))
+                self.events.put(("update_ready", path))
+            except Exception as e:  # noqa: BLE001
+                self.events.put(("update_failed", str(e)))
+        threading.Thread(target=work, daemon=True).start()
+
+    def _handle_update(self, kind: str, data):
+        if kind == "update_available":
+            self._update = data
+            self.check_btn.configure(text="Check for updates", state="normal")
+            installable = updater.is_installed_copy() and data.setup_url
+            self.upd_sub.configure(text=f"Version {data.version} is ready to install." if installable
+                                   else f"Version {data.version} is out.")
+            self.upd_btn.configure(text="Update now" if installable else "Get it on GitHub", state="normal")
+            if not self.upd_card.winfo_ismapped():
+                self.upd_card.pack(fill="x", pady=(0, 10), before=self.about_btn)
+        elif kind in ("update_none", "update_error"):
+            self.check_btn.configure(state="normal",
+                                     text=("You're up to date" if kind == "update_none" else "Couldn't check")
+                                     if data else "Check for updates")
+            if data:
+                self.after(4000, lambda: self.check_btn.configure(text="Check for updates"))
+        elif kind == "update_progress":
+            done, total = data
+            pct = f" {done * 100 // total}%" if total else ""
+            self.upd_btn.configure(text=f"Downloading{pct}")
+        elif kind == "update_failed":
+            self.upd_sub.configure(text=data)
+            self.upd_btn.configure(text="Try again", state="normal")
+        elif kind == "update_ready":
+            self.upd_btn.configure(text="Installing…")
+            self.upd_sub.configure(text="The app will close and reopen on the new version.")
+            try:
+                updater.launch_installer(data)
+            except OSError as e:
+                self._handle_update("update_failed", f"Couldn't start the installer: {e}")
+                return
+            self.after(900, self._on_close)
 
     def _on_close(self):
         if self.engine:

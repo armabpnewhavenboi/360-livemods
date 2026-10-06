@@ -21,6 +21,8 @@ UninstallDisplayIcon={app}\360LiveMods.exe
 Compression=lzma2/ultra
 SolidCompression=yes
 WizardStyle=modern
+CloseApplications=yes
+RestartApplications=no
 LicenseFile=..\LICENSE
 
 [Tasks]
@@ -35,4 +37,5 @@ Name: "{group}\Uninstall 360 LiveMods"; Filename: "{uninstallexe}"
 Name: "{userdesktop}\360 LiveMods"; Filename: "{app}\360LiveMods.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\360LiveMods.exe"; Description: "Launch 360 LiveMods"; Flags: nowait postinstall skipifsilent
+; Runs after a normal install (as a checkbox) and after a silent in-app update (relaunches the app)
+Filename: "{app}\360LiveMods.exe"; Description: "Launch 360 LiveMods"; Flags: nowait postinstall

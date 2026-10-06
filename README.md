@@ -53,6 +53,10 @@ All Fable II mods were tested on a real RGH console.
 
 Prefer no installer? Download the **Portable** zip, unzip it anywhere and run `360LiveMods.exe`.
 
+**Updates:** the app checks for new versions when it starts. When one is out, an
+**Update now** button appears in the sidebar and installs it for you. Portable copies link to the
+download page instead.
+
 > Windows may show a SmartScreen warning because the app isn't code-signed. Click
 > **More info → Run anyway**. The full source is in this repository and every release is built
 > automatically by GitHub Actions from it.

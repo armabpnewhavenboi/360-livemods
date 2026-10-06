@@ -129,3 +129,19 @@ def test_every_definition_is_valid():
             assert m.status in ("tested", "experimental", "unstable"), f"{g.id}/{m.id}: bad status"
             assert set(m.unavailable) <= vids, f"{g.id}/{m.id}: unavailable lists unknown version"
             assert any(m.available_for(v) for v in vids), f"{g.id}/{m.id}: not available for any version"
+
+
+def test_updater_picks_newest_release():
+    from livemods import updater
+    rels = [
+        {"tag_name": "v1.0.0", "html_url": "u1", "assets": []},
+        {"tag_name": "v1.10.0", "html_url": "u3", "draft": True, "assets": []},
+        {"tag_name": "v1.2.0", "html_url": "u2", "prerelease": True, "assets": [
+            {"name": "360LiveMods-Portable-1.2.0.zip", "browser_download_url": "https://github.com/x/p.zip", "size": 1},
+            {"name": "360LiveMods-Setup-1.2.0.exe", "browser_download_url": "https://github.com/x/s.exe", "size": 9}]},
+        {"tag_name": "nightly", "assets": []},
+    ]
+    r = updater.newest(rels)
+    assert r.version == "1.2.0" and r.setup_url == "https://github.com/x/s.exe" and r.setup_size == 9
+    assert updater.parse_version("v1.10.0") > updater.parse_version("1.9.9")
+    assert updater.parse_version("1.1") == (1, 1, 0)
