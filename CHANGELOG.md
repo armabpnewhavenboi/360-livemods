@@ -3,8 +3,9 @@
 ## 1.2.0
 - Live frame-rate readout: while the game runs with mods active, the status panel shows the
   current FPS plus the session average and low (reads the game's own once-per-frame counter).
-- Fable II: new experimental mods for both the base game and the title update: Remove screen overlay,
-  Fix screen tearing (V-Sync), and Performance mode (anti-aliasing off).
+- Fable II: new mods for both the base game and the title update, all tested on hardware: Remove
+  screen overlay, Fix screen tearing (V-Sync), Performance mode (anti-aliasing off), Turn off lamp
+  and torch shadows, Turn off screen-space light shadows.
 
 ## 1.1.0
 - Built-in updater: the app checks GitHub for new releases at startup (or via "Check for updates")

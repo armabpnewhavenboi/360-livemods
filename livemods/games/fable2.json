@@ -155,9 +155,9 @@
       "id": "msaa_off",
       "name": "Performance mode (anti-aliasing off)",
       "category": "Performance",
-      "description": "Turns off 2x anti-aliasing at the normal resolution so each frame fits the 360's fast video memory in one pass instead of two. The biggest frame-rate gain available; edges look a little more jagged. Already included in Native 720p.",
+      "description": "Turns off 2x anti-aliasing so each frame fits the 360's fast video memory in one pass instead of two. Frame times are noticeably smoother; edges look a little more jagged. Already included in Native 720p.",
       "default": false,
-      "status": "experimental",
+      "status": "tested",
       "credit": "Margen67 (standalone use by 360 LiveMods)",
       "patches": {
         "base": [
@@ -172,9 +172,9 @@
       "id": "light_shadows_off",
       "name": "Turn off lamp and torch shadows",
       "category": "Performance",
-      "description": "Stops lamps, torches, fires and other placed lights from casting live shadows. The sun's shadows are baked into the world and stay. Saves the most in towns at night and in caves.",
+      "description": "Stops lamps, torches, fires and other placed lights from casting live shadows; they still light the scene normally. The sun's shadows are baked into the world and stay. A small frame-rate gain, mostly in towns at night and in caves.",
       "default": false,
-      "status": "experimental",
+      "status": "tested",
       "credit": "360 LiveMods",
       "patches": {
         "base": [
@@ -191,7 +191,7 @@
       "category": "Performance",
       "description": "Skips the extra full-screen shadow pass the game uses for large lights. Lighter than turning light shadows off completely; has no effect if that is already on.",
       "default": false,
-      "status": "experimental",
+      "status": "tested",
       "credit": "360 LiveMods",
       "patches": {
         "base": [
@@ -206,7 +206,7 @@
       "id": "vsync",
       "name": "Fix screen tearing (V-Sync)",
       "category": "Performance",
-      "description": "Makes every frame wait for the TV's refresh, so the picture never tears. When the game can't keep up, the frame rate drops a step instead of tearing, so busy areas can feel less smooth.",
+      "description": "Makes every frame wait for the TV's refresh, so the picture never tears. With 60 FPS on, the game mostly holds a steady 30 outdoors and runs higher indoors, instead of tearing.",
       "default": false,
       "status": "tested",
       "credit": "360 LiveMods",

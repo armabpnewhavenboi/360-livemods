@@ -35,7 +35,9 @@ extracted), and with **your existing saves**.
 | Remove screen overlay | ✅ | ✅ |
 | 60 FPS | ✅ | ✅ |
 | Fix screen tearing (V-Sync) | ✅ | ✅ |
-| Performance mode (anti-aliasing off) | 🧪 experimental | 🧪 experimental |
+| Performance mode (anti-aliasing off) | ✅ | ✅ |
+| Turn off lamp and torch shadows | ✅ | ✅ |
+| Turn off screen-space light shadows | ✅ | ✅ |
 | Native 720p (no MSAA) | ✅ | ❌ crashes on the update |
 | 30 Hz tick rate | ⚠️ unstable | ❌ |
 
