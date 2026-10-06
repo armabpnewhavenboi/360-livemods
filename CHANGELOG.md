@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.3.0
+## 1.4.0
 - **Community library: 300+ games.** The app downloads the Xenia community patch library
   (github.com/xenia-canary/game-patches) and offers its patches for real consoles. Search by name
   or title ID in the sidebar.
@@ -15,6 +15,10 @@
   physics and stairs fixes and now also covers the title update (still marked unstable).
 - Long window text now wraps at small window sizes instead of being cut off.
 - Command line: `--update-library`, `--library [search]`, and library games by title ID.
+
+## 1.3.0
+- Fable II: Performance mode (anti-aliasing off) and the lamp/torch and screen-space shadow mods
+  are now marked tested on hardware; clearer descriptions for them and for V-Sync.
 
 ## 1.2.0
 - Live frame-rate readout: while the game runs with mods active, the status panel shows the
