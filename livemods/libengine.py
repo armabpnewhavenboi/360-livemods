@@ -34,7 +34,10 @@ MAX_UNKNOWN_SCANS = 2     # builds that never match are scanned at most this man
 POLL = 0.1
 CHANGE_CHECK_BYTES = 0x100000   # while scanning, check every MB that the game is still the same
 
-_DASHBOARD = re.compile(r"aurora|freestyle|\\fsd|fsd3|xexmenu|dashboard|\\dash\.xex|xshell", re.I)
+# Dashboards are recognised by their executable's name, or by the name of the folder it runs from
+# (never by words anywhere in the path: a game kept in "\FSD Games\..." is still a game).
+_DASHBOARD_EXE = re.compile(r"^(aurora|fsd\d?|freestyle\w*|xexmenu|dash|xshell|dashboard)\.xex$", re.I)
+_DASHBOARD_DIR = {"aurora", "freestyle", "freestyledash", "fsd", "fsd2", "fsd3", "xexmenu", "dashboard"}
 _GOD_TITLE = re.compile(r"\\content\\[0-9a-f]{16}\\([0-9a-f]{8})\\", re.I)
 
 
@@ -83,7 +86,8 @@ class LibraryEngine(Engine):
         """Do we know the original bytes at every patch site in this build's code?"""
         lo, hi = rec.get("code", (0, 0))
         orig = rec.get("originals", {})
-        return all(f"{w.address:08X}" in orig for p in build.patches for w in p.writes if lo <= w.address < hi)
+        return all(f"{w.address:08X}" in orig for p in build.patches for w in p.writes
+                   if lo <= w.address and w.address + len(w.data) <= hi)
 
     @staticmethod
     def _thunks(rec: dict) -> list[int]:
@@ -106,11 +110,16 @@ class LibraryEngine(Engine):
                 path = t.running_path() or ""
         except Exception:  # noqa: BLE001 - only a hint
             path = ""
-        where = f"{path} \\{snap.module.name}"
-        if _DASHBOARD.search(where):
-            return "dashboard", None
+        exe = path.replace("/", "\\").rsplit("\\", 1)[-1].lower()
+        if exe.endswith((".xex", ".exe")) and exe != snap.module.name.lower():
+            path = ""                       # describes something else (e.g. the previous title)
         m = _GOD_TITLE.search(path)
-        return ("title", m.group(1).upper()) if m else ("", None)
+        if m:
+            return "title", m.group(1).upper()
+        folder = path.replace("/", "\\").rsplit("\\", 2)[-2].lower() if path.count("\\") >= 1 else ""
+        if _DASHBOARD_EXE.match(snap.module.name) or folder in _DASHBOARD_DIR:
+            return "dashboard", None
+        return "", None
 
     # -------------------------------------------------------------- identify
     def _identify(self, host: str, x: XbdmClient, snap: Snap):
@@ -170,7 +179,9 @@ class LibraryEngine(Engine):
         rec = record_from_scan(scan, snap.module)
         hit = self._match(rec, title)
         if hit is None:
-            rec["unknown_scans"] = int((old or {}).get("unknown_scans", 0)) + 1
+            prev = old or {}
+            fresh = prev.get("seen", 0) < self.library.fetched_at      # library updated since
+            rec["unknown_scans"] = 1 if fresh else int(prev.get("unknown_scans", 0)) + 1
             self.cache.put(snap.fp, rec)
             self._emit("warn", f"The game that started (build {scan.hashes[0x10000]:016X}) isn't a version of "
                                f"{title.name} in the community library, so nothing was changed. If it is "
@@ -327,28 +338,28 @@ class LibraryEngine(Engine):
         x: XbdmClient | None = None
         first = True
         present: str | None = None          # fingerprint currently running
-        skip: set[str] = set()              # leave alone while it keeps running
-        dashboards: set[str] = set()        # leave alone for the whole run
-        hints: dict[str, tuple[str, str | None]] = {}
+        skip: set[str] = set()              # leave alone while it keeps running (dashboard, other game)
+        hints: dict[str, tuple[str, str | None]] = {}   # per appearance of a build
         relaunch: str | None = None         # identified this run; waiting for a fresh start of it
         relaunch_gone = False
         since = 0.0                         # when `present` appeared
         last_state, last_print, t0 = "", 0.0, time.time()
-        connected_before = False
+        lost = False
         self._emit("status", f"Waiting for {title.name}… launch it now")
         while not self.stopped:
             state = "Waiting for the game to start"
             try:
                 if x is None:
                     x = XbdmClient(host)
-                    if connected_before:
-                        self._emit("info", "Connected to console.")
-                    connected_before = True
                 snap = self._snapshot(x)
+                if lost:
+                    self._emit("info", "Connected to console.")
+                    lost = False
                 fp = snap.fp if snap else None
                 if fp != present:
                     if present is not None:
                         skip.discard(present)
+                        hints.pop(present, None)
                     present, since = fp, time.time()
                     if relaunch and fp != relaunch:
                         relaunch_gone = True
@@ -367,17 +378,22 @@ class LibraryEngine(Engine):
                             continue          # still loading: handled like a fresh launch
                         if fp not in hints:
                             hints[fp] = self._hint(snap)
-                        kind, _ = hints[fp]
-                        if kind == "dashboard":
-                            dashboards.add(fp)
-                        else:
+                        kind, tid = hints[fp]
+                        if kind == "dashboard" or (kind == "title" and tid != title.title_id):
+                            skip.add(fp)
+                        elif hit:
                             skip.add(fp)
                             self._emit("info", f"Something is already running ({snap.module.name}). If it's "
                                                f"{title.name}, quit it to the dashboard and start it again.")
+                        else:
+                            # possibly the game itself, already running: identifying is read-only, so
+                            # check it now instead of asking for an extra restart
+                            self._emit("info", f"Something is already running ({snap.module.name}) - checking "
+                                               f"whether it's {title.name}.")
                 elif fp is None:
                     if relaunch:
                         state = f"Waiting for {title.name} to start again"
-                elif fp in dashboards or fp in skip:
+                elif fp in skip:
                     if relaunch:
                         state = f"Waiting for {title.name} to start again"
                 elif fp == relaunch and not relaunch_gone:
@@ -399,23 +415,27 @@ class LibraryEngine(Engine):
                                 break
                             result = RunResult(failed=[])
                             continue
-                    elif rec and not hit and int(rec.get("unknown_scans", 0)) >= MAX_UNKNOWN_SCANS:
+                    elif rec and not hit and int(rec.get("unknown_scans", 0)) >= MAX_UNKNOWN_SCANS \
+                            and rec.get("seen", 0) >= self.library.fetched_at:
                         self._emit("warn", f"The game that started (build {rec.get('hashes', {}).get('65536', '?')}) "
                                            f"isn't a version of {title.name} in the community library.")
                         skip.add(fp)
                     else:
-                        if fp not in hints:
+                        settled = time.time() - since >= IDENTIFY_SETTLE
+                        if settled and fp not in hints:
+                            # asked only once it has settled: right after a launch, XBDM may still
+                            # describe the previous title (often the dashboard)
                             hints[fp] = self._hint(snap)
-                        kind, tid = hints[fp]
-                        if kind == "dashboard":
-                            dashboards.add(fp)
+                        kind, tid = hints.get(fp, ("", None))
+                        if not settled:
+                            state = "Game loading"
+                        elif kind == "dashboard":
+                            skip.add(fp)
                         elif kind == "title" and tid != title.title_id:
                             other = self.library.by_id.get(tid)
                             self._emit("error", f"That's {other.name if other else 'title ' + tid}, not "
                                                 f"{title.name}. Nothing was changed.")
                             skip.add(fp)
-                        elif time.time() - since < IDENTIFY_SETTLE:
-                            state = "Game loading"
                         else:
                             outcome = self._first_time(host, x, snap, title, rec)
                             if outcome == "identified":
@@ -440,6 +460,7 @@ class LibraryEngine(Engine):
                 if x:
                     x.close()
                 x = None
+                lost = True
                 state = f"Can't reach the console ({e.__class__.__name__}) - retrying"
             now_t = time.time()
             if state != last_state or now_t - last_print > 5:

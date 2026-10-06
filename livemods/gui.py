@@ -541,8 +541,8 @@ class App(ctk.CTk):
         self.act = act
         self.led = Led(act, size=22)
         self.led.grid(row=0, column=0, padx=(18, 12), pady=18)
-        st = ctk.CTkFrame(act, fg_color="transparent")
-        st.grid(row=0, column=1, sticky="ew")
+        st = ctk.CTkFrame(act, fg_color=C["panel"], corner_radius=0)
+        st.grid(row=0, column=1, sticky="ew", pady=2)
         st.bind("<Configure>", lambda e: (self._wrap_to(self.status_sub, e.width, 0),
                                           self._wrap_to(self.status, e.width, 0)), add="+")
         self.status = ctk.CTkLabel(st, text="Ready", font=F.d(20), text_color=C["text"], anchor="w", justify="left")

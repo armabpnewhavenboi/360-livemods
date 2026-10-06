@@ -241,10 +241,9 @@ def load_library(folder: Path | None = None) -> Library:
         t = titles.setdefault(tid, LibTitle(tid, name))
         if len(name) < len(t.name) or not t.name:
             t.name = name                      # several files per game: keep the plainest name
-        same = next((b for b in t.builds if set(b.hashes) & set(build.hashes)), None)
+        same = next((b for b in t.builds if set(b.hashes) == set(build.hashes)), None)
         if same:                               # two files for the same build (e.g. TU10 and TU18
             same.patches += build.patches      # sharing an executable): one version, all patches
-            same.hashes += [h for h in build.hashes if h not in same.hashes]
             if build.label not in same.label.split("; "):
                 same.label += f"; {build.label}"
             same.file += f"; {build.file}"
@@ -346,7 +345,11 @@ def _swap_in(new: Path, folder: Path) -> None:
         raise
     shutil.rmtree(old, ignore_errors=True)
     for stale in folder.parent.glob(f"{folder.name}.*-*"):    # leftovers from interrupted updates
-        shutil.rmtree(stale, ignore_errors=True)
+        try:
+            if time.time() - stale.stat().st_mtime > 3600:
+                shutil.rmtree(stale, ignore_errors=True)
+        except OSError:
+            pass
 
 
 # ------------------------------------------------------------------------ app model

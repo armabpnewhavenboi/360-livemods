@@ -385,7 +385,7 @@ def test_relaunch_without_a_dashboard_module_in_between(lib, tmp_path):
 
 def test_dashboard_is_never_scanned(lib, tmp_path):
     cache = BuildCache(tmp_path / "b.json")
-    aurora = r"\Device\Harddisk0\Partition1\Apps\Aurora\Aurora.xex"
+    aurora = r"\Device\Harddisk0\Partition1\Apps\Aurora\default.xex"     # recognised by its folder
     tl = [(0, None), (0.2, DASH, "default.xex", aurora)] + boot(GAME_A, 0.5) + \
          [(4.0, DASH, "default.xex", aurora)] + boot(GAME_A, 8.0)
     r, ev, srv = run_engine(tl, lib, "4D530001", {"60 FPS"}, cache, stop_after=12)
@@ -463,3 +463,38 @@ def test_same_build_in_two_files_is_one_version(tmp_path):
     assert len(t.builds) == 1 and t.builds[0].label == "TU10; TU18"
     g = to_game(t)
     assert [m.name for m in g.mods] == ["A", "A (2)", "B"] and len(g.versions) == 1
+
+
+AUR = "\\Device\\Harddisk0\\Partition1\\Aurora\\Aurora.xex"
+
+
+def test_base_visible_long_before_title_update(lib, tmp_path):
+    cache = BuildCache(tmp_path / "b.json")
+    tl = [(0, None), (0.3, GAME_A), (2.5, GAME_A_TU), (2.8, resolved(GAME_A_TU)),
+          (6.0, None)] + boot(GAME_A_TU, 6.5)
+    r, ev, srv = run_engine(tl, lib, "4D530001", {"60 FPS"}, cache, stop_after=12)
+    assert srv.writes == [(0x82012350, bytes.fromhex("39600001"))], srv.writes
+
+def test_works_without_xbeinfo(lib, tmp_path, monkeypatch):
+    monkeypatch.setattr(xb.XbdmClient, "running_path", lambda self: None)
+    cache = BuildCache(tmp_path / "b.json")
+    tl = [(0, resolved(GAME_A)), (1.0, DASH, "Aurora.xex")] + boot(GAME_A, 1.5) \
+         + [(4.5, DASH, "Aurora.xex")] + boot(GAME_A, 5.0)
+    r, ev, srv = run_engine(tl, lib, "4D530001", {"60 FPS"}, cache, stop_after=10)
+    assert dict(srv.writes).get(0x82012340) == bytes.fromhex("39600001")
+
+def test_stale_xbeinfo_path_does_not_hide_the_game(lib, tmp_path):
+    """The game module is listed while XBDM still reports the dashboard as the running title."""
+    cache = BuildCache(tmp_path / "b.json")
+    tl = [(0, DASH, "Aurora.xex", AUR), (0.5, GAME_A, "default.xex", AUR), (0.7, resolved(GAME_A)),
+          (4.0, DASH, "Aurora.xex", AUR), (4.5, GAME_A, "default.xex", AUR), (4.7, resolved(GAME_A))]
+    r, ev, srv = run_engine(tl, lib, "4D530001", {"60 FPS"}, cache, stop_after=9)
+    assert srv.writes, "game misclassified as dashboard for the whole run"
+
+def test_other_library_game_then_selected_one(lib, tmp_path):
+    cache = BuildCache(tmp_path / "b.json")
+    tl = [(0, DASH, "Aurora.xex", AUR)] + boot(OTHER, 0.3) + [(3.0, DASH, "Aurora.xex", AUR)] + boot(GAME_A, 3.5) \
+         + [(6.5, DASH, "Aurora.xex", AUR)] + boot(GAME_A, 7.0)
+    r, ev, srv = run_engine(tl, lib, "4D530001", {"60 FPS"}, cache, stop_after=12)
+    assert all(a != 0x82011000 for a, _ in srv.writes)
+    assert dict(srv.writes).get(0x82012340) == bytes.fromhex("39600001")

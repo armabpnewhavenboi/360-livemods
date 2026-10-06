@@ -37,6 +37,10 @@ computes that same hash (about a minute, once per version). Patches are only app
 matches, so a patch can never land on the wrong version. From then on the game is recognised the
 moment it loads and patched before it runs.
 
+<p align="center">
+  <img src="docs/screenshot-library.png" width="720" alt="A community library game">
+</p>
+
 Library patches were written for the Xenia emulator and most haven't been tried on a real console,
 so they're marked **Community**. Patches that only work around emulator problems are marked
 **Emulator fix** and ask before you enable them. If a game crashes, untick the patches you added last.
