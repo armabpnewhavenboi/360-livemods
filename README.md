@@ -119,8 +119,8 @@ pyinstaller --noconfirm 360LiveMods.spec
 iscc /DAppVersion=1.0.0 installer\360LiveMods.iss   # optional: the installer (Inno Setup 6)
 ```
 
-Pushing a tag such as `v1.0.1` makes GitHub Actions build the installer and portable zip and
-attach them to a new release.
+Publishing a release on GitHub (Releases → Draft a new release, with a new tag such as `v1.0.1`) makes
+GitHub Actions build the installer and portable zip and attach them to that release.
 
 ## Credits
 

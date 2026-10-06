@@ -1,8 +1,11 @@
 name: Build Windows installer
 
 on:
+  release:
+    types: [published]    # publish a release on GitHub (e.g. tag v1.0.0) to build and attach the installer
   push:
-    tags: ["v*"]          # push a tag like v1.0.0 to publish a release
+    branches: [main]      # every push to main is built too (download it from the run's Artifacts)
+    tags: ["v*"]
   workflow_dispatch:      # or run it by hand from the Actions tab
 
 permissions:
@@ -58,12 +61,11 @@ jobs:
             installer/Output/*.exe
             360LiveMods-Portable-*.zip
 
-      - name: Publish GitHub release
+      - name: Attach files to the GitHub release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          name: 360 LiveMods ${{ steps.ver.outputs.version }}
-          generate_release_notes: true
+          tag_name: ${{ github.ref_name }}
           files: |
             installer/Output/*.exe
             360LiveMods-Portable-*.zip
