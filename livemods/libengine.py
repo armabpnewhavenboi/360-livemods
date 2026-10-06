@@ -102,6 +102,14 @@ class LibraryEngine(Engine):
         return all(thunk_state(x.read(a, 16)) == "resolved" for a in self._thunks(rec))
 
     def _hint(self, snap: Snap) -> tuple[str, str | None]:
+        first = self._hint_once(snap)
+        if first[0] == "title":
+            time.sleep(1.0)                 # a path left over from the previous game would change
+            if self._hint_once(snap) != first:
+                return "", None
+        return first
+
+    def _hint_once(self, snap: Snap) -> tuple[str, str | None]:
         """('dashboard' | 'title' | '', title id) from the running executable's name and path.
         Asked on a separate connection: if this XBDM answers in an unexpected way, the main
         connection is never thrown out of step."""
@@ -224,7 +232,8 @@ class LibraryEngine(Engine):
                 self._emit("warn", f"{mod.name}: skipped - 0x{p.address:08X} is outside the game's "
                                    f"memory (this kind of patch only works in the emulator).")
                 return False
-            if not restore and code_lo <= p.address < code_hi and f"{p.address:08X}" not in originals:
+            in_code = code_lo <= p.address and p.address + len(p.patched) <= code_hi
+            if not restore and in_code and f"{p.address:08X}" not in originals:
                 self._emit("warn", f"{mod.name}: skipped - this patch changed after the game was identified. "
                                    "Select the game again in the sidebar and restart it.")
                 return False
@@ -251,7 +260,7 @@ class LibraryEngine(Engine):
                 if cur == p.patched:
                     continue
                 orig = originals.get(key)
-                if code_lo <= p.address < code_hi and (not orig or cur.hex().upper() != orig.upper()):
+                if code_lo <= p.address and p.address + n <= code_hi and (not orig or cur.hex().upper() != orig.upper()):
                     bad = (p, f"holds {cur.hex().upper()}, expected {(orig or '?').upper()}")
                     continue
                 todo.append((p, p.patched))
@@ -381,10 +390,9 @@ class LibraryEngine(Engine):
                         kind, tid = hints[fp]
                         if kind == "dashboard" or (kind == "title" and tid != title.title_id):
                             skip.add(fp)
-                        elif hit:
+                        elif hit and hit[0].title_id != title.title_id:
                             skip.add(fp)
-                            self._emit("info", f"Something is already running ({snap.module.name}). If it's "
-                                               f"{title.name}, quit it to the dashboard and start it again.")
+                            self._emit("info", f"{hit[0].name} is running. Start {title.name} when you're ready.")
                         else:
                             # possibly the game itself, already running: identifying is read-only, so
                             # check it now instead of asking for an extra restart
