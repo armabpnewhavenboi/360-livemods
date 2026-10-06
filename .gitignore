@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec.bak
+.venv/
+venv/
+installer/Output/
+# never commit game code or memory dumps
+*.bin
+*.xex
+*.xexp
