@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.0
+- Fable II: new experimental mod, Remove screen overlay (base game and title update).
+
 ## 1.1.0
 - Built-in updater: the app checks GitHub for new releases at startup (or via "Check for updates")
   and installs them in one click. Portable copies get a link to the download page instead.

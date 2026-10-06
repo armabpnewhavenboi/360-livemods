@@ -32,6 +32,7 @@ extracted), and with **your existing saves**.
 | Remove motion blur | ✅ | ✅ |
 | Remove depth of field | ✅ | ✅ |
 | Remove distance fog | ✅ | ✅ |
+| Remove screen overlay | 🧪 experimental | 🧪 experimental |
 | 60 FPS | ✅ | ✅ |
 | Native 720p (no MSAA) | ✅ | ❌ crashes on the update |
 | 30 Hz tick rate | ⚠️ unstable | ❌ |

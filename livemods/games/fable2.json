@@ -4,7 +4,10 @@
   "name": "Fable II",
   "title_id": "4D5307F1",
   "description": "Strip the haze, glow and smear from Albion and unlock the frame rate.",
-  "banner": { "file": "fable2_banner.jpg", "focus": [0.5, 0.12] },
+  "banner": {
+    "file": "fable2_banner.jpg",
+    "focus": [0.5, 0.12]
+  },
   "notes": [
     "Pick the version that matches your console: if Fable II's title update is enabled in Aurora/FSD, choose Title Update.",
     "Changes last until you quit the game. Start 360 LiveMods before launching Fable II every time you play."
@@ -20,13 +23,19 @@
       "id": "base",
       "name": "Base game",
       "hint": "Title update disabled",
-      "detect": { "address": "0x83282140", "values": ["388755A4", "388755B4"] }
+      "detect": {
+        "address": "0x83282140",
+        "values": ["388755A4", "388755B4"]
+      }
     },
     {
       "id": "tu",
       "name": "Title Update",
       "hint": "Title update enabled",
-      "detect": { "address": "0x832895E8", "values": ["388761D0", "388761E0"] }
+      "detect": {
+        "address": "0x832895E8",
+        "values": ["388761D0", "388761E0"]
+      }
     }
   ],
   "mods": [
@@ -39,8 +48,14 @@
       "status": "tested",
       "credit": "punchbrotv",
       "patches": {
-        "base": [["0x83282140", "388755A4", "388755B4"], ["0x83282240", "388754B0", "388754C8"]],
-        "tu":   [["0x832895E8", "388761D0", "388761E0"], ["0x832896E8", "388760DC", "388760F4"]]
+        "base": [
+          ["0x83282140", "388755A4", "388755B4"],
+          ["0x83282240", "388754B0", "388754C8"]
+        ],
+        "tu": [
+          ["0x832895E8", "388761D0", "388761E0"],
+          ["0x832896E8", "388760DC", "388760F4"]
+        ]
       }
     },
     {
@@ -52,8 +67,12 @@
       "status": "tested",
       "credit": "punchbrotv",
       "patches": {
-        "base": [["0x8328248C", "388352B0", "388352DC"]],
-        "tu":   [["0x83289934", "38835EDC", "38835F08"]]
+        "base": [
+          ["0x8328248C", "388352B0", "388352DC"]
+        ],
+        "tu": [
+          ["0x83289934", "38835EDC", "38835F08"]
+        ]
       }
     },
     {
@@ -65,8 +84,14 @@
       "status": "tested",
       "credit": "punchbrotv",
       "patches": {
-        "base": [["0x83282F1C", "38864BBC", "38864BD8"], ["0x83282F5C", "38834B8C", "38834BA8"]],
-        "tu":   [["0x8328A3C4", "388657E8", "38865804"], ["0x8328A404", "388357B8", "388357D4"]]
+        "base": [
+          ["0x83282F1C", "38864BBC", "38864BD8"],
+          ["0x83282F5C", "38834B8C", "38834BA8"]
+        ],
+        "tu": [
+          ["0x8328A3C4", "388657E8", "38865804"],
+          ["0x8328A404", "388357B8", "388357D4"]
+        ]
       }
     },
     {
@@ -78,8 +103,33 @@
       "status": "tested",
       "credit": "punchbrotv (title-update fix by 360 LiveMods)",
       "patches": {
-        "base": [["0x83281BD8", "38895A68", "38895A7C"], ["0x83281C58", "38845A14", "38845A20"], ["0x83281CD8", "388959C8", "388959D4"]],
-        "tu":   [["0x83289080", "38896694", "388966AC"], ["0x83289100", "38846640", "3884664C"], ["0x83289180", "388965F4", "38896600"]]
+        "base": [
+          ["0x83281BD8", "38895A68", "38895A7C"],
+          ["0x83281C58", "38845A14", "38845A20"],
+          ["0x83281CD8", "388959C8", "388959D4"]
+        ],
+        "tu": [
+          ["0x83289080", "38896694", "388966AC"],
+          ["0x83289100", "38846640", "3884664C"],
+          ["0x83289180", "388965F4", "38896600"]
+        ]
+      }
+    },
+    {
+      "id": "overlay",
+      "name": "Remove screen overlay",
+      "category": "Visual",
+      "description": "Removes the texture the game lays over the whole screen, part of Fable II's soft, dreamy filter.",
+      "default": false,
+      "status": "experimental",
+      "credit": "360 LiveMods",
+      "patches": {
+        "base": [
+          ["0x83282340", "388753B0", "388753C0"]
+        ],
+        "tu": [
+          ["0x832897E8", "38875FDC", "38875FEC"]
+        ]
       }
     },
     {
@@ -91,8 +141,12 @@
       "status": "tested",
       "credit": "Margen67",
       "patches": {
-        "base": [["0x82B9C8E8", "39600002", "39600001"]],
-        "tu":   [["0x82BA3058", "39600002", "39600001"]]
+        "base": [
+          ["0x82B9C8E8", "39600002", "39600001"]
+        ],
+        "tu": [
+          ["0x82BA3058", "39600002", "39600001"]
+        ]
       }
     },
     {
@@ -104,8 +158,14 @@
       "status": "tested",
       "credit": "Margen67",
       "patches": {
-        "base": [["0x8238DF58", "39600460", "39600500"], ["0x8238DF3C", "39200002", "39200001"]],
-        "tu":   [["0x823894C0", "39600460", "39600500"], ["0x823894A4", "39200002", "39200001"]]
+        "base": [
+          ["0x8238DF58", "39600460", "39600500"],
+          ["0x8238DF3C", "39200002", "39200001"]
+        ],
+        "tu": [
+          ["0x823894C0", "39600460", "39600500"],
+          ["0x823894A4", "39200002", "39200001"]
+        ]
       },
       "unavailable": {
         "tu": "Crashes the game with the title update. Choose Base game to use it."
@@ -121,7 +181,10 @@
       "credit": "Guy",
       "warning": "Crashed when loading into a save during testing. Only enable it if you want to experiment.",
       "patches": {
-        "base": [["0x8233AEB4", "D8089510", "60000000"], ["0x83319510", "402E0000", "403E0000"]]
+        "base": [
+          ["0x8233AEB4", "D8089510", "60000000"],
+          ["0x83319510", "402E0000", "403E0000"]
+        ]
       },
       "unavailable": {
         "tu": "Not available for the title update."
