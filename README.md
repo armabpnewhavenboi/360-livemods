@@ -32,9 +32,10 @@ extracted), and with **your existing saves**.
 | Remove motion blur | ✅ | ✅ |
 | Remove depth of field | ✅ | ✅ |
 | Remove distance fog | ✅ | ✅ |
-| Remove screen overlay | 🧪 experimental | 🧪 experimental |
+| Remove screen overlay | ✅ | ✅ |
 | 60 FPS | ✅ | ✅ |
-| Fix screen tearing (V-Sync) | 🧪 experimental | 🧪 experimental |
+| Fix screen tearing (V-Sync) | ✅ | ✅ |
+| Performance mode (anti-aliasing off) | 🧪 experimental | 🧪 experimental |
 | Native 720p (no MSAA) | ✅ | ❌ crashes on the update |
 | 30 Hz tick rate | ⚠️ unstable | ❌ |
 

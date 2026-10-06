@@ -121,7 +121,7 @@
       "category": "Visual",
       "description": "Removes the texture the game lays over the whole screen, part of Fable II's soft, dreamy filter.",
       "default": false,
-      "status": "experimental",
+      "status": "tested",
       "credit": "360 LiveMods",
       "patches": {
         "base": [
@@ -150,12 +150,29 @@
       }
     },
     {
+      "id": "msaa_off",
+      "name": "Performance mode (anti-aliasing off)",
+      "category": "Performance",
+      "description": "Turns off 2x anti-aliasing at the normal resolution so each frame fits the 360's fast video memory in one pass instead of two. The biggest frame-rate gain available; edges look a little more jagged. Already included in Native 720p.",
+      "default": false,
+      "status": "experimental",
+      "credit": "Margen67 (standalone use by 360 LiveMods)",
+      "patches": {
+        "base": [
+          ["0x8238DF3C", "39200002", "39200001"]
+        ],
+        "tu": [
+          ["0x823894A4", "39200002", "39200001"]
+        ]
+      }
+    },
+    {
       "id": "vsync",
       "name": "Fix screen tearing (V-Sync)",
       "category": "Performance",
       "description": "Makes every frame wait for the TV's refresh, so the picture never tears. When the game can't keep up, the frame rate drops a step instead of tearing, so busy areas can feel less smooth.",
       "default": false,
-      "status": "experimental",
+      "status": "tested",
       "credit": "360 LiveMods",
       "patches": {
         "base": [
