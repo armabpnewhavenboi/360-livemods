@@ -70,7 +70,8 @@ download page instead.
 2. Enter your console's IP (shown on Aurora's main screen) and press **Test**.
 3. Pick your **game version**: it must match whether the game's title update is enabled in Aurora/FSD.
 4. Tick the mods you want and press **Start**.
-5. Launch the game. The mods are applied the moment it loads, and the status turns green.
+5. Launch the game. The mods are applied the moment it loads, and the status turns green and
+   shows your live frame rate.
 6. Load your save and play.
 
 Do this each time you start the game: patches last until you quit. Your IP, version and mod

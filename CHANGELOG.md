@@ -1,6 +1,8 @@
 # Changelog
 
 ## 1.2.0
+- Live frame-rate readout: while the game runs with mods active, the status panel shows the
+  current FPS plus the session average and low (reads the game's own once-per-frame counter).
 - Fable II: new experimental mods for both the base game and the title update: Remove screen overlay,
   Fix screen tearing (V-Sync), and Performance mode (anti-aliasing off).
 

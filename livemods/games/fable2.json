@@ -26,7 +26,8 @@
       "detect": {
         "address": "0x83282140",
         "values": ["388755A4", "388755B4"]
-      }
+      },
+      "fps_counter": { "pointer": "0x8336019C", "offset": "0x40B0" }
     },
     {
       "id": "tu",
@@ -35,7 +36,8 @@
       "detect": {
         "address": "0x832895E8",
         "values": ["388761D0", "388761E0"]
-      }
+      },
+      "fps_counter": { "pointer": "0x83360364", "offset": "0x40B0" }
     }
   ],
   "mods": [

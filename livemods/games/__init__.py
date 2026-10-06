@@ -26,6 +26,8 @@ class Version:
     hint: str
     detect_address: int
     detect_values: list[bytes]
+    fps_pointer: int | None = None     # global holding a pointer to the object with the frame counter
+    fps_offset: int = 0                # offset of the once-per-frame counter inside that object
 
 
 @dataclass
@@ -84,6 +86,8 @@ def load_game(path: Path) -> Game:
             id=v["id"], name=v["name"], hint=v.get("hint", ""),
             detect_address=_addr(v["detect"]["address"]),
             detect_values=[_hex(x) for x in v["detect"]["values"]],
+            fps_pointer=_addr(v["fps_counter"]["pointer"]) if v.get("fps_counter") else None,
+            fps_offset=_addr(v["fps_counter"]["offset"]) if v.get("fps_counter") else 0,
         )
         for v in raw["versions"]
     ]

@@ -23,7 +23,10 @@ the same `id` overrides the built-in one.
       "id": "base",
       "name": "Base game",
       "hint": "Title update disabled",
-      "detect": { "address": "0x83282140", "values": ["388755A4", "388755B4"] }
+      "detect": { "address": "0x83282140", "values": ["388755A4", "388755B4"] },
+      "fps_counter": { "pointer": "0x8336019C", "offset": "0x40B0" }   // optional live FPS readout:
+                                        // a global holding a pointer, plus the offset of a counter
+                                        // that goes up once per presented frame
     }
   ],
 

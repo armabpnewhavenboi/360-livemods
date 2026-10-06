@@ -145,3 +145,38 @@ def test_updater_picks_newest_release():
     assert r.version == "1.2.0" and r.setup_url == "https://github.com/x/s.exe" and r.setup_size == 9
     assert updater.parse_version("v1.10.0") > updater.parse_version("1.9.9")
     assert updater.parse_version("1.1") == (1, 1, 0)
+
+
+def test_fps_monitor_reads_frame_counter():
+    """A fake console whose frame counter ticks at 45/s; then the game quits."""
+    import struct
+    import threading
+    import time
+    import livemods.xbdm as x
+    from livemods.engine import FpsMonitor
+    from livemods.games import Version
+    mem = bytearray(0x200000)
+    v = Version("t", "T", "", 0x82000100, [bytes.fromhex("11223344")], fps_pointer=0x82000200, fps_offset=0x40B0)
+    struct.pack_into(">I", mem, 0x100, 0x11223344)
+    struct.pack_into(">I", mem, 0x200, 0x82100000)          # pointer to the "device"
+    srv = FakeXbdm([(0, mem), (4.5, None)], port=0)
+    srv._memory()
+    stop = threading.Event()
+
+    def tick():
+        t0 = time.time()
+        while not stop.is_set():
+            if srv._mem is not None:
+                struct.pack_into(">I", srv._mem, 0x1000B0 + 0x40B0 - 0xB0, int((time.time() - t0) * 45))
+            time.sleep(0.003)
+    threading.Thread(target=tick, daemon=True).start()
+    samples, ended = [], []
+    x.XbdmClient.__init__.__defaults__ = (srv.port, 5.0)
+    try:
+        FpsMonitor("127.0.0.1", v, lambda f, a, l: samples.append(f), ended.append, interval=0.5).run()
+    finally:
+        stop.set()
+        x.XbdmClient.__init__.__defaults__ = (730, 5.0)
+        srv.close()
+    assert samples and all(40 <= s <= 50 for s in samples), samples
+    assert ended == ["The game has closed."]

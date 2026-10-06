@@ -13,7 +13,7 @@ import customtkinter as ctk
 
 from . import APP_NAME, __version__
 from .config import Settings
-from .engine import Engine
+from .engine import Engine, FpsMonitor
 from .games import Game, Mod, load_all, user_dir
 from . import updater
 from .banner import HEADER_H, render_banner
@@ -467,6 +467,13 @@ class App(ctk.CTk):
         self.status_sub = ctk.CTkLabel(st, text="Press Start, then launch the game on your console.",
                                        font=F.b(12), text_color=C["muted"], anchor="w")
         self.status_sub.pack(fill="x")
+        # live frame rate (shown while the game runs with mods active)
+        self.fps_box = ctk.CTkFrame(act, fg_color="transparent")
+        self.fps_val = ctk.CTkLabel(self.fps_box, text="--", font=F.d(34), text_color=C["text"], anchor="e")
+        self.fps_val.pack(side="left")
+        ctk.CTkLabel(self.fps_box, text="FPS", font=F.m(12), text_color=C["muted"]).pack(
+            side="left", padx=(6, 0), pady=(14, 0))
+        self.fps_monitor = None
         self.restore_btn = ctk.CTkButton(act, text="Restore originals", height=42, width=150, font=F.m(13),
                                          fg_color=C["raised"], hover_color=C["line"], text_color=C["text"],
                                          command=self.restore)
@@ -661,6 +668,8 @@ class App(ctk.CTk):
         if not ip:
             return
         game, vid = self.game, self.version_id
+        self._stop_fps()
+        self._fps_target = (ip, game.version(vid))
         if not self._log_visible:
             self._toggle_log()
         self.log("info", "─" * 46)
@@ -727,6 +736,8 @@ class App(ctk.CTk):
             low = msg.lower()
             if low in ("mods active", "restored"):
                 self._set_status(msg, C["ok"], False, "Patches last until you quit the game.")
+                if low == "mods active":
+                    self._start_fps()
             elif "wrong" in low or "not running" in low or "couldn't" in low:
                 self._set_status(msg, C["err"], False, "See the activity log for details.")
             elif "warning" in low:
@@ -737,6 +748,16 @@ class App(ctk.CTk):
                 self._set_status(msg, C["amber"], True)
         elif kind.startswith("update_"):
             self._handle_update(kind, msg)
+        elif kind == "fps":
+            fps, avg, low_ = msg
+            self.fps_val.configure(text=f"{fps:.0f}",
+                                   text_color=C["ok"] if fps >= 55 else C["amber"] if fps >= 40 else C["text"])
+            self.status_sub.configure(text=f"Average {avg:.0f} FPS, low {low_:.0f}. Patches last until you quit.")
+        elif kind == "fps_end":
+            self._stop_fps()
+            if msg:
+                self._set_status("Game closed" if "closed" in msg else "Disconnected", C["faint"], False,
+                                 msg + " Press Start before launching it again.")
         elif kind == "done":
             self._lock(False)
             if self.status.cget("text").startswith(("Waiting", "Connecting", "Stopping")):
@@ -826,7 +847,32 @@ class App(ctk.CTk):
                 return
             self.after(900, self._on_close)
 
+    # -------------------------------------------------------------- frame rate
+    def _start_fps(self):
+        ip, version = getattr(self, "_fps_target", (None, None))
+        if not ip or version is None or version.fps_pointer is None:
+            return
+        self._stop_fps()
+        self.fps_val.configure(text="--", text_color=C["text"])
+        self.fps_box.grid(row=0, column=2, padx=(0, 18))
+        self.restore_btn.grid_configure(column=3)
+        self.start_btn.grid_configure(column=4)
+        self.fps_monitor = FpsMonitor(ip, version,
+                                      lambda f, a, l: self.events.put(("fps", (f, a, l))),
+                                      lambda reason: self.events.put(("fps_end", reason)))
+        threading.Thread(target=self.fps_monitor.run, daemon=True).start()
+
+    def _stop_fps(self):
+        if self.fps_monitor:
+            self.fps_monitor.stop()
+            self.fps_monitor = None
+        if self.fps_box.winfo_ismapped():
+            self.fps_box.grid_remove()
+            self.restore_btn.grid_configure(column=2)
+            self.start_btn.grid_configure(column=3)
+
     def _on_close(self):
+        self._stop_fps()
         if self.engine:
             self.engine.stop()
         self.settings.save()

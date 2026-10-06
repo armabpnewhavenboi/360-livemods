@@ -230,3 +230,54 @@ class Engine:
             self._emit("ok", "All done - original settings restored." if restore
                        else "All done. Load your save and enjoy.")
             self._emit("status", "Restored" if restore else "Mods active")
+
+
+class FpsMonitor:
+    """Polls a game's once-per-frame counter over XBDM and reports frames per second.
+
+    on_sample(fps, average, low) is called about once a second; on_end(reason) once when the
+    game stops (quit, crash) or stop() is called.
+    """
+
+    def __init__(self, host: str, version: Version, on_sample, on_end, interval: float = 1.0):
+        self.host, self.version = host, version
+        self.on_sample, self.on_end, self.interval = on_sample, on_end, interval
+        self._stop = threading.Event()
+
+    def stop(self) -> None:
+        self._stop.set()
+
+    def run(self) -> None:
+        v = self.version
+        if v.fps_pointer is None:
+            self.on_end("This game has no frame counter defined.")
+            return
+        samples: list[float] = []
+        misses = 0
+        try:
+            with XbdmClient(self.host) as x:
+                last = None
+                while not self._stop.is_set():
+                    ptr = x.read(v.fps_pointer, 4)
+                    cnt = x.read(int.from_bytes(ptr, "big") + v.fps_offset, 4) if ptr else None
+                    now = time.time()
+                    if cnt is None or x.read(v.detect_address, 4) not in v.detect_values:
+                        misses += 1
+                        if misses >= 3:
+                            self.on_end("The game has closed.")
+                            return
+                    else:
+                        misses = 0
+                        c = int.from_bytes(cnt, "big")
+                        if last and c >= last[1]:
+                            fps = (c - last[1]) / (now - last[0])
+                            if fps < 240:                      # ignore garbage during loads
+                                samples.append(fps)
+                                samples[:] = samples[-600:]    # last ~10 minutes
+                                self.on_sample(fps, sum(samples) / len(samples), min(samples))
+                        last = (now, c)
+                    self._stop.wait(self.interval)
+        except (OSError, XbdmError):
+            self.on_end("Lost connection to the console.")
+            return
+        self.on_end("")
