@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.1
+- Fixed the mods list not scrolling: only the first few mods were reachable until the window was resized.
+
 ## 1.0.0
 - First release.
 - Fable II: remove bloom, motion blur, depth of field and distance fog; 60 FPS; native 720p

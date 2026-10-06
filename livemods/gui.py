@@ -427,7 +427,9 @@ class App(ctk.CTk):
                                                 scrollbar_button_hover_color=C["faint"])
         self.mod_frame.grid(row=3, column=0, sticky="nsew")
         self.mod_frame.grid_columnconfigure(0, weight=1)
-        self.mod_frame.bind("<Configure>", self._rewrap)
+        # Listen on the outer canvas, and add to (not replace) its bindings: the scrollable frame's
+        # own <Configure> handler is what keeps the scrollbar's range up to date.
+        self.mod_frame._parent_canvas.bind("<Configure>", self._rewrap, add="+")
 
         # action / status panel (the one loud element)
         act = ctk.CTkFrame(main, fg_color=C["panel"], corner_radius=10, border_width=1, border_color=C["line"])
@@ -511,7 +513,7 @@ class App(ctk.CTk):
         self.on_selection_changed()
 
     def _rewrap(self, event=None):
-        width = max(320, self.mod_frame.winfo_width() - 110)
+        width = max(320, self.mod_frame._parent_canvas.winfo_width() - 110)
         for row in self.rows.values():
             row.desc.configure(wraplength=width)
 
